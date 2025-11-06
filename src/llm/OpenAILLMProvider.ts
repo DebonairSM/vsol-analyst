@@ -9,7 +9,7 @@ export class OpenAILLMProvider implements LLMProvider {
     this.client = new OpenAI({
       apiKey: opts?.apiKey ?? process.env.OPENAI_API_KEY,
     });
-    this.defaultModel = opts?.defaultModel ?? "gpt-3.5-turbo";
+    this.defaultModel = opts?.defaultModel ?? "gpt-4o-mini";
   }
 
   async chat(opts: {
