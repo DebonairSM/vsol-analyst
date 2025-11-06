@@ -44,3 +44,5 @@ Desktop.ini
 # Temporary files
 *.tmp
 .cache/
+
+/src/generated/prisma
