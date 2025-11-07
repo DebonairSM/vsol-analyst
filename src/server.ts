@@ -38,6 +38,12 @@ app.use(passport.session());
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, "../public")));
 
+// Bypass ngrok browser warning
+app.use((req, res, next) => {
+  res.setHeader('ngrok-skip-browser-warning', 'true');
+  next();
+});
+
 const llm = new OpenAILLMProvider();
 const extractor = new RequirementsExtractor(llm);
 const docs = new DocumentGenerator();

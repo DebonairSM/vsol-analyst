@@ -1,6 +1,8 @@
-# VSol Systems Analyst Agent
+# Sunny - VSol Systems Analyst Agent
 
 AI-powered business requirements discovery tool using OpenAI with Google authentication and per-user project management.
+
+Meet Sunny, your friendly systems analyst agent who helps gather and document business requirements through natural conversation.
 
 ## Features
 
@@ -110,7 +112,7 @@ You'll now see an "ADMIN" badge in the header and an "Admin Dashboard" button on
 1. Open http://localhost:5051 in your browser
 2. Sign in with your Google account
 3. Create a new project or select an existing one
-4. Start chatting with the analyst agent about your business
+4. Start chatting with Sunny about your business
 5. When ready, click "Extract Requirements" to generate structured output
 6. Download the requirements.md and workflow.mmd files
 
@@ -159,7 +161,7 @@ This opens a visual interface at http://localhost:5555 to browse and edit your d
 
 #### POST /analyst/chat
 
-Start or continue a conversation with the analyst for a specific project.
+Start or continue a conversation with Sunny for a specific project.
 
 **Request:**
 ```json
@@ -244,7 +246,7 @@ The system supports two roles:
 
 1. **Client Users** (default):
    - Can create and manage their own projects
-   - Can chat with the analyst about their business
+   - Can chat with Sunny about their business
    - Can extract and download requirements
    - Only see their own data
 

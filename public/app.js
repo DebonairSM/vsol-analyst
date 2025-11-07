@@ -258,18 +258,18 @@ async function loadChatHistory(projectId) {
             // If no messages were shown, show welcome message
             if (!hasMessages) {
                 const firstName = currentUser.name.split(' ')[0];
-                addMessage('assistant', `Hello, ${firstName}! I'm your VSol Systems Analyst for "${project.name}". Tell me about your business, and I'll help you identify your requirements.`);
+                addMessage('assistant', `Hello, ${firstName}! I'm Sunny, your friendly systems analyst for "${project.name}". Tell me about your business, and I'll help you identify your requirements.`);
             }
         } else {
             // No chat history, show welcome message
             const firstName = currentUser.name.split(' ')[0];
-            addMessage('assistant', `Hello, ${firstName}! I'm your VSol Systems Analyst for "${project.name}". Tell me about your business, and I'll help you identify your requirements.`);
+            addMessage('assistant', `Hello, ${firstName}! I'm Sunny, your friendly systems analyst for "${project.name}". Tell me about your business, and I'll help you identify your requirements.`);
         }
     } catch (error) {
         console.error('Error loading chat history:', error);
         // Show welcome message as fallback
         const firstName = currentUser.name.split(' ')[0];
-        addMessage('assistant', `Hello, ${firstName}! I'm your VSol Systems Analyst for "${currentProject.name}". Tell me about your business, and I'll help you identify your requirements.`);
+        addMessage('assistant', `Hello, ${firstName}! I'm Sunny, your friendly systems analyst for "${currentProject.name}". Tell me about your business, and I'll help you identify your requirements.`);
     }
 }
 
@@ -277,15 +277,29 @@ function addMessage(role, content) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${role}`;
     
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'message-header';
+    
+    // Add avatar for assistant messages
+    if (role === 'assistant') {
+        const avatar = document.createElement('img');
+        avatar.src = '/assets/sunny-face.png';
+        avatar.alt = 'Sunny';
+        avatar.className = 'message-avatar';
+        headerDiv.appendChild(avatar);
+    }
+    
     const label = document.createElement('div');
     label.className = 'message-label';
-    label.textContent = role === 'user' ? 'You' : 'Analyst';
+    label.textContent = role === 'user' ? 'You' : 'Sunny';
+    
+    headerDiv.appendChild(label);
     
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
     contentDiv.textContent = content;
     
-    messageDiv.appendChild(label);
+    messageDiv.appendChild(headerDiv);
     messageDiv.appendChild(contentDiv);
     chatContainer.appendChild(messageDiv);
     

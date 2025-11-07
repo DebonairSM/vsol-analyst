@@ -1,7 +1,7 @@
 {
   "name": "vsol-analyst",
   "version": "1.0.0",
-  "description": "VSol Systems Analyst Agent - AI-powered business requirements discovery",
+  "description": "Sunny - VSol Systems Analyst Agent - AI-powered business requirements discovery",
   "main": "src/server.ts",
   "scripts": {
     "dev": "tsx src/server.ts",

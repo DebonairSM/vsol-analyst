@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VSol Systems Analyst</title>
+    <title>Sunny - VSol Systems Analyst</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <style>
         * {
@@ -14,31 +14,81 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #f5f5f5;
+            background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%);
             height: 100vh;
             display: flex;
             flex-direction: column;
         }
 
         header {
-            background: #2c3e50;
-            color: white;
-            padding: 1rem 2rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: white;
+            color: #2C3E50;
+            padding: 0;
+            box-shadow: none;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-top {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            padding: 1rem 2rem;
+        }
+
+        .header-separator {
+            height: 3px;
+            background: #FFD93D;
+            width: 100%;
+        }
+
+        .header-bottom {
+            height: 40px;
+            background: #1e3a8a;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-bottom::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                repeating-linear-gradient(
+                    90deg,
+                    rgba(96, 165, 250, 0.1) 0px,
+                    rgba(96, 165, 250, 0.1) 1px,
+                    transparent 1px,
+                    transparent 20px
+                );
+            opacity: 0.3;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-logo {
+            height: 45px;
+            width: auto;
         }
 
         .header-left h1 {
             font-size: 1.5rem;
-            font-weight: 600;
+            font-weight: 700;
+            color: #111827;
         }
 
         .subtitle {
             font-size: 0.9rem;
-            color: #bdc3c7;
+            color: #4b5563;
             margin-top: 0.25rem;
+            font-weight: 400;
         }
 
         .header-right {
@@ -62,38 +112,42 @@
         }
 
         .admin-role-badge {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #06b6d4 100%);
             color: white;
             padding: 0.2rem 0.6rem;
             border-radius: 12px;
             font-size: 0.75rem;
             font-weight: 600;
             letter-spacing: 0.5px;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
             animation: glow 2s ease-in-out infinite;
         }
 
         @keyframes glow {
             0%, 100% {
-                box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+                box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
             }
             50% {
-                box-shadow: 0 2px 12px rgba(102, 126, 234, 0.6);
+                box-shadow: 0 2px 12px rgba(168, 85, 247, 0.5);
             }
         }
 
         .logout-btn {
-            background: #e74c3c;
+            background: #FF6B6B;
             color: white;
             padding: 0.5rem 1rem;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s;
         }
 
         .logout-btn:hover {
-            background: #c0392b;
+            background: #EE5A52;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(255,107,107,0.3);
         }
 
         main {
@@ -122,39 +176,52 @@
 
         .login-card {
             background: white;
-            border-radius: 8px;
-            padding: 2rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
             text-align: center;
             max-width: 400px;
+            border: 3px solid #FFD93D;
+        }
+
+        .login-logo {
+            width: 120px;
+            height: auto;
+            margin-bottom: 1.5rem;
         }
 
         .login-card h2 {
-            margin-bottom: 1rem;
-            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            color: #111827;
+            font-size: 1.8rem;
         }
 
         .login-card p {
-            margin-bottom: 1.5rem;
-            color: #7f8c8d;
+            margin-bottom: 2rem;
+            color: #4b5563;
+            font-size: 1rem;
         }
 
         .google-login-btn {
-            background: #4285f4;
+            background: #2563eb;
             color: white;
-            padding: 0.75rem 1.5rem;
+            padding: 0.875rem 2rem;
             border: none;
-            border-radius: 4px;
+            border-radius: 12px;
             cursor: pointer;
             font-size: 1rem;
             font-weight: 600;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(37,99,235,0.3);
         }
 
         .google-login-btn:hover {
-            background: #357ae8;
+            background: #1d4ed8;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(37,99,235,0.4);
         }
 
         /* Projects Dashboard */
@@ -183,36 +250,41 @@
         }
 
         .projects-header h2 {
-            color: #2c3e50;
+            color: #111827;
         }
 
         .new-project-btn {
-            background: #27ae60;
+            background: #16a34a;
             color: white;
             padding: 0.75rem 1.5rem;
             border: none;
-            border-radius: 4px;
+            border-radius: 10px;
             cursor: pointer;
             font-size: 1rem;
             font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 3px 10px rgba(22,163,74,0.3);
         }
 
         .new-project-btn:hover {
-            background: #229954;
+            background: #15803d;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(22,163,74,0.4);
         }
 
         .projects-list {
             flex: 1;
             background: white;
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 1.5rem;
             overflow-y: auto;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border: 2px solid #dbeafe;
         }
 
         .project-item {
             padding: 1rem;
-            border-bottom: 1px solid #ecf0f1;
+            border-bottom: 1px solid #f3f4f6;
             cursor: pointer;
             transition: background 0.2s;
         }
@@ -222,23 +294,23 @@
         }
 
         .project-item:hover {
-            background: #f8f9fa;
+            background: #f9fafb;
         }
 
         .project-name {
             font-weight: 600;
-            color: #2c3e50;
+            color: #111827;
             margin-bottom: 0.25rem;
         }
 
         .project-date {
             font-size: 0.85rem;
-            color: #7f8c8d;
+            color: #6b7280;
         }
 
         .empty-state {
             text-align: center;
-            color: #7f8c8d;
+            color: #6b7280;
             padding: 2rem;
         }
 
@@ -261,31 +333,35 @@
         }
 
         .chat-header h2 {
-            color: #2c3e50;
+            color: #111827;
         }
 
         .back-btn {
-            background: #95a5a6;
+            background: #9ca3af;
             color: white;
             padding: 0.5rem 1rem;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s;
         }
 
         .back-btn:hover {
-            background: #7f8c8d;
+            background: #6b7280;
+            transform: translateY(-1px);
         }
 
         #chat-container {
             flex: 1;
             background: white;
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 1.5rem;
             overflow-y: auto;
             margin-bottom: 1rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border: 2px solid #dbeafe;
         }
 
         .message {
@@ -302,29 +378,48 @@
             align-items: flex-start;
         }
 
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: white;
+            padding: 3px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            object-fit: contain;
+        }
+
         .message-label {
             font-size: 0.75rem;
-            color: #7f8c8d;
-            margin-bottom: 0.25rem;
-            font-weight: 600;
+            color: #4b5563;
+            font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .message-content {
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
+            padding: 0.875rem 1.25rem;
+            border-radius: 16px;
             max-width: 80%;
             word-wrap: break-word;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
 
         .message.user .message-content {
-            background: #3498db;
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
             color: white;
         }
 
         .message.assistant .message-content {
-            background: #ecf0f1;
-            color: #2c3e50;
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            color: #374151;
+            font-weight: 500;
         }
 
         #input-container {
@@ -332,59 +427,76 @@
             gap: 0.5rem;
             background: white;
             padding: 1rem;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border: 2px solid #dbeafe;
         }
 
         #message-input {
             flex: 1;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 0.875rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
             font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        #message-input:focus {
+            outline: none;
+            border-color: #2563eb;
         }
 
         button {
             padding: 0.75rem 1.5rem;
             border: none;
-            border-radius: 4px;
+            border-radius: 10px;
             font-size: 1rem;
             cursor: pointer;
             font-weight: 600;
-            transition: background 0.2s;
+            transition: all 0.3s;
         }
 
         #send-btn {
-            background: #3498db;
+            background: #2563eb;
             color: white;
+            box-shadow: 0 3px 10px rgba(37,99,235,0.3);
         }
 
         #send-btn:hover {
-            background: #2980b9;
+            background: #1d4ed8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37,99,235,0.4);
         }
 
         #send-btn:disabled {
-            background: #95a5a6;
+            background: #d1d5db;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
         #extract-btn {
-            background: #27ae60;
+            background: #16a34a;
             color: white;
+            box-shadow: 0 3px 10px rgba(22,163,74,0.3);
         }
 
         #extract-btn:hover {
-            background: #229954;
+            background: #15803d;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(22,163,74,0.4);
         }
 
         #extract-btn:disabled {
-            background: #95a5a6;
+            background: #d1d5db;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
         .loading {
             text-align: center;
-            color: #7f8c8d;
+            color: #6b7280;
             padding: 1rem;
             font-style: italic;
         }
@@ -392,10 +504,11 @@
         #output-container {
             display: none;
             background: white;
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 1.5rem;
             margin-top: 1rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border: 2px solid #dbeafe;
         }
 
         #output-container.visible {
@@ -408,27 +521,30 @@
 
         .output-section h3 {
             margin-bottom: 0.5rem;
-            color: #2c3e50;
+            color: #111827;
         }
 
         .output-section textarea {
             width: 100%;
             min-height: 200px;
             padding: 0.75rem;
-            border: 1px solid #ddd;
+            border: 1px solid #d1d5db;
             border-radius: 4px;
             font-family: monospace;
             font-size: 0.9rem;
         }
 
         .download-btn {
-            background: #9b59b6;
+            background: #8b5cf6;
             color: white;
             margin-top: 0.5rem;
+            box-shadow: 0 3px 10px rgba(139,92,246,0.3);
         }
 
         .download-btn:hover {
-            background: #8e44ad;
+            background: #7c3aed;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(139,92,246,0.4);
         }
 
         /* Modal */
@@ -459,13 +575,13 @@
 
         .modal-content h3 {
             margin-bottom: 1rem;
-            color: #2c3e50;
+            color: #111827;
         }
 
         .modal-content input {
             width: 100%;
             padding: 0.75rem;
-            border: 1px solid #ddd;
+            border: 1px solid #d1d5db;
             border-radius: 4px;
             font-size: 1rem;
             margin-bottom: 1rem;
@@ -478,21 +594,21 @@
         }
 
         .cancel-btn {
-            background: #95a5a6;
+            background: #9ca3af;
             color: white;
         }
 
         .cancel-btn:hover {
-            background: #7f8c8d;
+            background: #6b7280;
         }
 
         .create-btn {
-            background: #27ae60;
+            background: #16a34a;
             color: white;
         }
 
         .create-btn:hover {
-            background: #229954;
+            background: #15803d;
         }
 
         /* Admin Tabs */
@@ -500,7 +616,7 @@
             padding: 0.5rem 1rem;
             background: transparent;
             border: none;
-            color: #7f8c8d;
+            color: #6b7280;
             cursor: pointer;
             font-size: 0.95rem;
             border-bottom: 2px solid transparent;
@@ -508,17 +624,17 @@
         }
 
         .admin-tab:hover {
-            color: #2c3e50;
+            color: #374151;
         }
 
         .admin-tab.active {
-            color: #e74c3c;
-            border-bottom-color: #e74c3c;
+            color: #2563eb;
+            border-bottom-color: #2563eb;
         }
 
         .user-card, .admin-project-card {
             padding: 1rem;
-            border-bottom: 1px solid #ecf0f1;
+            border-bottom: 1px solid #f3f4f6;
         }
 
         .user-card:last-child, .admin-project-card:last-child {
@@ -534,58 +650,70 @@
 
         .user-card-name {
             font-weight: 600;
-            color: #2c3e50;
+            color: #111827;
         }
 
         .user-card-email {
             font-size: 0.9rem;
-            color: #7f8c8d;
+            color: #6b7280;
         }
 
         .user-card-stats {
             font-size: 0.85rem;
-            color: #95a5a6;
+            color: #9ca3af;
             margin-top: 0.25rem;
         }
 
         .view-chat-btn {
-            background: #3498db;
+            background: #2563eb;
             color: white;
             padding: 0.4rem 0.8rem;
             font-size: 0.85rem;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 6px rgba(37,99,235,0.3);
         }
 
         .view-chat-btn:hover {
-            background: #2980b9;
+            background: #1d4ed8;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(37,99,235,0.4);
         }
     </style>
 </head>
 <body>
     <header>
-        <div class="header-left">
-            <h1>VSol Systems Analyst</h1>
-            <div class="subtitle">AI-powered business requirements discovery</div>
-        </div>
-        <div class="header-right" id="user-header" style="display: none;">
-            <div class="user-info">
-                <div class="user-name-line">
-                    <span id="user-name"></span>
+        <div class="header-top">
+            <div class="header-left">
+                <img src="/assets/vsol-logo-25-c.png" alt="vSol Logo" class="header-logo">
+                <div>
+                    <h1>Sunny</h1>
+                    <div class="subtitle">A Systems Analyst Agent by VSol Software</div>
                 </div>
-                <span id="admin-badge" class="admin-role-badge" style="display: none;">Agentic Master</span>
             </div>
-            <button class="logout-btn" onclick="logout()">Logout</button>
+            <div class="header-right" id="user-header" style="display: none;">
+                <div class="user-info">
+                    <div class="user-name-line">
+                        <span id="user-name"></span>
+                    </div>
+                    <span id="admin-badge" class="admin-role-badge" style="display: none;">Agentic Master</span>
+                </div>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
         </div>
+        <div class="header-separator"></div>
+        <div class="header-bottom"></div>
     </header>
 
     <main>
         <!-- Login Page -->
         <div id="login-page">
             <div class="login-card">
-                <h2>Welcome to VSol Systems Analyst</h2>
-                <p>Sign in with Google to get started</p>
+                <img src="/assets/sunny-face.png" alt="Sunny Logo" class="login-logo">
+                <h2>Welcome to Sunny</h2>
+                <p>Your friendly systems analyst agent. Sign in with Google to get started</p>
                 <button class="google-login-btn" onclick="loginWithGoogle()">
                     <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
                         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -604,7 +732,7 @@
             <div class="projects-header">
                 <h2 id="projects-page-title">Your Projects</h2>
                 <div>
-                    <button id="admin-view-btn" class="new-project-btn" onclick="showAdminDashboard()" style="display: none; margin-right: 0.5rem; background: #e74c3c;">Admin Dashboard</button>
+                    <button id="admin-view-btn" class="new-project-btn" onclick="showAdminDashboard()" style="display: none; margin-right: 0.5rem; background: #FF6B6B;">Admin Dashboard</button>
                     <button class="new-project-btn" onclick="showNewProjectModal()">+ New Project</button>
                 </div>
             </div>
