@@ -18,6 +18,7 @@ const projectTitle = document.getElementById('project-title');
 const chatContainer = document.getElementById('chat-container');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
+const polishBtn = document.getElementById('polish-btn');
 const extractBtn = document.getElementById('extract-btn');
 const markdownOutput = document.getElementById('markdown-output');
 const mermaidOutput = document.getElementById('mermaid-output');
@@ -219,6 +220,7 @@ function backToProjects() {
     // Re-enable input if it was disabled for admin view
     messageInput.disabled = false;
     sendBtn.disabled = false;
+    polishBtn.disabled = false;
     extractBtn.disabled = false;
     messageInput.placeholder = 'Tell me about your business...';
     
@@ -459,7 +461,7 @@ async function performExtraction() {
     extractBtn.disabled = false;
 }
 
-function copyMarkdown() {
+function copyMarkdown(event) {
     const content = markdownOutput.value;
     navigator.clipboard.writeText(content).then(() => {
         const btn = event.target;
@@ -476,7 +478,7 @@ function copyMarkdown() {
     });
 }
 
-function copyMermaid() {
+function copyMermaid(event) {
     const content = mermaidOutput.value;
     navigator.clipboard.writeText(content).then(() => {
         const btn = event.target;
@@ -663,6 +665,7 @@ async function viewProjectChat(projectId) {
         // Disable input for admin view
         messageInput.disabled = true;
         sendBtn.disabled = true;
+        polishBtn.disabled = true;
         extractBtn.disabled = true;
         messageInput.placeholder = 'Admin view - read only';
         
@@ -683,8 +686,109 @@ async function viewProjectChat(projectId) {
     }
 }
 
+// Polish Text Functions
+let polishedTextCache = '';
+
+async function polishText() {
+    const text = messageInput.value.trim();
+    
+    if (!text || isProcessing) return;
+    
+    if (text.length < 5) {
+        alert('Please enter some text to polish.');
+        return;
+    }
+    
+    isProcessing = true;
+    sendBtn.disabled = true;
+    polishBtn.disabled = true;
+    extractBtn.disabled = true;
+    
+    // Show modal with loading animation
+    showPolishModal();
+    
+    try {
+        const response = await fetch('/analyst/polish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                hidePolishModal();
+                alert('Session expired. Please login again.');
+                showLogin();
+                return;
+            }
+            throw new Error('Polish failed');
+        }
+        
+        const data = await response.json();
+        
+        // Store the polished text
+        polishedTextCache = data.polished;
+        
+        // Display the comparison
+        document.getElementById('polish-original-text').textContent = data.original;
+        document.getElementById('polish-polished-text').textContent = data.polished;
+        
+        // Switch modal to show results
+        showPolishResults();
+    } catch (error) {
+        hidePolishModal();
+        alert('Failed to polish text. Please try again.');
+        console.error('Error:', error);
+    }
+    
+    isProcessing = false;
+    sendBtn.disabled = false;
+    polishBtn.disabled = false;
+    extractBtn.disabled = false;
+}
+
+function showPolishModal() {
+    const modal = document.getElementById('polish-modal');
+    const loadingDiv = document.getElementById('polish-loading');
+    const resultsDiv = document.getElementById('polish-results');
+    
+    // Show loading state
+    loadingDiv.style.display = 'block';
+    resultsDiv.style.display = 'none';
+    modal.classList.add('visible');
+}
+
+function showPolishResults() {
+    const loadingDiv = document.getElementById('polish-loading');
+    const resultsDiv = document.getElementById('polish-results');
+    
+    // Switch to results state
+    loadingDiv.style.display = 'none';
+    resultsDiv.style.display = 'block';
+}
+
+function hidePolishModal() {
+    const modal = document.getElementById('polish-modal');
+    modal.classList.remove('visible');
+    polishedTextCache = '';
+}
+
+function acceptPolish() {
+    if (polishedTextCache) {
+        messageInput.value = polishedTextCache;
+        messageInput.focus();
+    }
+    hidePolishModal();
+}
+
+function rejectPolish() {
+    hidePolishModal();
+    messageInput.focus();
+}
+
 // Event listeners
 sendBtn.addEventListener('click', sendMessage);
+polishBtn.addEventListener('click', polishText);
 extractBtn.addEventListener('click', extractRequirements);
 
 messageInput.addEventListener('keypress', (e) => {
@@ -714,15 +818,24 @@ document.getElementById('output-modal').addEventListener('click', (e) => {
     }
 });
 
+document.getElementById('polish-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'polish-modal') {
+        hidePolishModal();
+    }
+});
+
 // Close modal with Escape key
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const confirmModal = document.getElementById('confirm-extract-modal');
         const outputModal = document.getElementById('output-modal');
+        const polishModal = document.getElementById('polish-modal');
         if (confirmModal.classList.contains('visible')) {
             hideConfirmExtractModal();
         } else if (outputModal.classList.contains('visible')) {
             hideOutputModal();
+        } else if (polishModal.classList.contains('visible')) {
+            hidePolishModal();
         }
     }
 });

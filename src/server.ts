@@ -11,7 +11,7 @@ import { requireAuth, requireAdmin } from "./auth/middleware";
 import { OpenAILLMProvider } from "./llm/OpenAILLMProvider";
 import { RequirementsExtractor } from "./analyst/RequirementsExtractor";
 import { DocumentGenerator } from "./analyst/DocumentGenerator";
-import { SYSTEM_PROMPT_ANALYST } from "./analyst/prompts";
+import { SYSTEM_PROMPT_ANALYST, SYSTEM_PROMPT_POLISHER } from "./analyst/prompts";
 import { ChatMessage } from "./llm/LLMProvider";
 
 const app = express();
@@ -447,6 +447,35 @@ app.post("/analyst/extract", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Error extracting requirements:", error);
     res.status(500).json({ error: "Extraction failed" });
+  }
+});
+
+// Polish text endpoint
+app.post("/analyst/polish", requireAuth, async (req, res) => {
+  try {
+    const { text } = req.body as { text: string };
+
+    if (!text || typeof text !== "string") {
+      return res.status(400).json({ error: "text is required" });
+    }
+
+    if (text.trim().length === 0) {
+      return res.status(400).json({ error: "text cannot be empty" });
+    }
+
+    // Use the LLM to polish the text
+    const polished = await llm.chat({
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT_POLISHER },
+        { role: "user", content: text },
+      ],
+      temperature: 0.3,
+    });
+
+    res.json({ original: text, polished: polished.trim() });
+  } catch (error) {
+    console.error("Error polishing text:", error);
+    res.status(500).json({ error: "Polishing failed" });
   }
 });
 
