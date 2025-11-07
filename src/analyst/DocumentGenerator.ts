@@ -6,23 +6,51 @@ export class DocumentGenerator {
 
     lines.push(`# System Requirements`);
     lines.push("");
+    
+    // Business Context
     if (req.businessContext.companyName) {
       lines.push(`**Client:** ${req.businessContext.companyName}`);
     }
     if (req.businessContext.industry) {
       lines.push(`**Industry:** ${req.businessContext.industry}`);
     }
+    if (req.businessContext.region) {
+      lines.push(`**Region:** ${req.businessContext.region}`);
+    }
+    if (req.businessContext.sizeDescription) {
+      lines.push(`**Size:** ${req.businessContext.sizeDescription}`);
+    }
     lines.push("");
+    
+    // Primary Goal
     lines.push(`## Primary Goal`);
     lines.push(req.primaryGoal || "Not clearly defined yet.");
     lines.push("");
 
+    // Secondary Goals
     if (req.secondaryGoals?.length) {
       lines.push(`## Secondary Goals`);
       for (const g of req.secondaryGoals) lines.push(`- ${g}`);
       lines.push("");
     }
 
+    // Current Tools
+    if (req.currentTools?.length) {
+      lines.push(`## Current Tools and Systems`);
+      for (const tool of req.currentTools) lines.push(`- ${tool}`);
+      lines.push("");
+    }
+
+    // Main Actors
+    if (req.mainActors?.length) {
+      lines.push(`## Users and Roles`);
+      for (const actor of req.mainActors) {
+        lines.push(`- **${actor.name}**: ${actor.description}`);
+      }
+      lines.push("");
+    }
+
+    // Pain Points
     if (req.painPoints?.length) {
       lines.push(`## Pain Points`);
       for (const p of req.painPoints) {
@@ -33,6 +61,21 @@ export class DocumentGenerator {
       lines.push("");
     }
 
+    // Data Entities - CRITICAL for spreadsheet data
+    if (req.dataEntities?.length) {
+      lines.push(`## Data Entities and Structure`);
+      for (const entity of req.dataEntities) {
+        lines.push(`### ${entity.name}`);
+        if (entity.fields?.length) {
+          for (const field of entity.fields) {
+            lines.push(`- ${field}`);
+          }
+        }
+        lines.push("");
+      }
+    }
+
+    // Candidate Modules
     if (req.candidateModules?.length) {
       lines.push(`## Candidate Modules`);
       for (const m of req.candidateModules) {
@@ -43,12 +86,23 @@ export class DocumentGenerator {
       lines.push("");
     }
 
+    // Non Functional Needs
     if (req.nonFunctionalNeeds?.length) {
       lines.push(`## Non Functional Needs`);
       for (const n of req.nonFunctionalNeeds) lines.push(`- ${n}`);
       lines.push("");
     }
 
+    // Risks and Constraints
+    if (req.risksAndConstraints?.length) {
+      lines.push(`## Risks and Constraints`);
+      for (const risk of req.risksAndConstraints) {
+        lines.push(`- ${risk.description} (type: ${risk.type})`);
+      }
+      lines.push("");
+    }
+
+    // Open Questions
     if (req.openQuestions?.length) {
       lines.push(`## Open Questions`);
       for (const q of req.openQuestions) lines.push(`- ${q}`);

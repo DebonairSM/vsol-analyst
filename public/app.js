@@ -287,7 +287,8 @@ function addMessage(role, content) {
         avatar.alt = 'Sunny';
         avatar.className = 'message-avatar';
         headerDiv.appendChild(avatar);
-    } else if (role === 'user' && currentUser && currentUser.picture) {
+    } else if (role === 'user' && currentUser && currentUser.picture && !currentProject?.isAdminView) {
+        // Only show user avatar if not in admin view
         const avatar = document.createElement('img');
         avatar.src = currentUser.picture;
         avatar.alt = currentUser.name;
@@ -786,10 +787,104 @@ function rejectPolish() {
     messageInput.focus();
 }
 
+// Excel Upload Functions
+const uploadExcelBtn = document.getElementById('upload-excel-btn');
+const excelFileInput = document.getElementById('excel-file-input');
+
+function uploadExcel() {
+    if (isProcessing || !currentProject) return;
+    
+    // Trigger file input
+    excelFileInput.click();
+}
+
+async function handleExcelUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    const allowedTypes = [
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+        alert('Please upload an Excel file (.xls or .xlsx)');
+        excelFileInput.value = '';
+        return;
+    }
+    
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+        alert('File size must be less than 10MB');
+        excelFileInput.value = '';
+        return;
+    }
+    
+    isProcessing = true;
+    sendBtn.disabled = true;
+    polishBtn.disabled = true;
+    extractBtn.disabled = true;
+    uploadExcelBtn.disabled = true;
+    
+    // Show uploading message
+    addMessage('user', `📊 Uploading: ${file.name}`);
+    showLoading();
+    
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('projectId', currentProject.id);
+        
+        const response = await fetch('/analyst/upload-excel', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                removeLoading();
+                alert('Session expired. Please login again.');
+                showLogin();
+                return;
+            }
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Upload failed');
+        }
+        
+        const data = await response.json();
+        removeLoading();
+        
+        // Display the Excel summary
+        addMessage('assistant', data.summary);
+        
+        // Optionally, you can also add a follow-up message
+        addMessage('assistant', 'I\'ve analyzed your Excel file. Would you like me to help you understand this data better or incorporate it into your requirements?');
+        
+    } catch (error) {
+        removeLoading();
+        addMessage('assistant', `Sorry, I encountered an error uploading the file: ${error.message}`);
+        console.error('Error uploading Excel:', error);
+    }
+    
+    // Reset file input
+    excelFileInput.value = '';
+    
+    isProcessing = false;
+    sendBtn.disabled = false;
+    polishBtn.disabled = false;
+    extractBtn.disabled = false;
+    uploadExcelBtn.disabled = false;
+    messageInput.focus();
+}
+
 // Event listeners
 sendBtn.addEventListener('click', sendMessage);
 polishBtn.addEventListener('click', polishText);
 extractBtn.addEventListener('click', extractRequirements);
+uploadExcelBtn.addEventListener('click', uploadExcel);
+excelFileInput.addEventListener('change', handleExcelUpload);
 
 messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

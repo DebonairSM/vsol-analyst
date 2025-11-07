@@ -10,6 +10,7 @@ Meet Sunny, your friendly systems analyst agent who helps gather and document bu
 - Per-user project management
 - Admin dashboard to monitor all client sessions
 - Interactive chat with customers to understand their workflows
+- Excel spreadsheet upload and analysis
 - Automatic extraction of structured requirements from conversations
 - Generate requirements documents in Markdown format
 - Generate workflow diagrams in Mermaid format
@@ -113,8 +114,9 @@ You'll now see an "ADMIN" badge in the header and an "Admin Dashboard" button on
 2. Sign in with your Google account
 3. Create a new project or select an existing one
 4. Start chatting with Sunny about your business
-5. When ready, click "Extract Requirements" to generate structured output
-6. Download the requirements.md and workflow.mmd files
+5. Upload Excel spreadsheets (.xls, .xlsx) to share data with Sunny
+6. When ready, click "Extract Requirements" to generate structured output
+7. Download the requirements.md and workflow.mmd files
 
 **For Admins:**
 1. After setting up admin access (see Setup section), log in
@@ -133,6 +135,22 @@ npx prisma studio
 ```
 
 This opens a visual interface at http://localhost:5555 to browse and edit your data.
+
+### Database Backup
+
+Create a backup of your database to OneDrive:
+
+```bash
+npm run backup
+```
+
+The backup script:
+- Automatically backs up to `%USERPROFILE%\OneDrive\Documents\vsol-analyst-backups\`
+- Creates timestamped backup files
+- Keeps the 10 most recent backups
+- Can be customized with the `BACKUP_PATH` environment variable
+
+For more details on setting up scheduled backups, see [backup-setup.md](backup-setup.md).
 
 ## API Endpoints
 
@@ -158,6 +176,28 @@ This opens a visual interface at http://localhost:5555 to browse and edit your d
 - `GET /api/admin/projects/:id/chat` - View chat history for any project
 
 ### Chat & Analysis
+
+#### POST /analyst/upload-excel
+
+Upload and analyze an Excel spreadsheet for a project.
+
+**Request:**
+- Content-Type: `multipart/form-data`
+- Body:
+  - `file`: Excel file (.xls or .xlsx, max 10MB)
+  - `projectId`: Project ID
+
+**Response:**
+```json
+{
+  "filename": "data.xlsx",
+  "sheets": {
+    "Sheet1": [[...], [...]],
+    "Sheet2": [[...], [...]]
+  },
+  "summary": "📊 Excel File: data.xlsx\nNumber of sheets: 2..."
+}
+```
 
 #### POST /analyst/chat
 

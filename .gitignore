@@ -45,4 +45,7 @@ Desktop.ini
 *.tmp
 .cache/
 
+# Uploaded files
+uploads/
+
 /src/generated/prisma

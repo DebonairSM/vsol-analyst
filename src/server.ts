@@ -5,6 +5,9 @@ import express from "express";
 import bodyParser from "body-parser";
 import session from "express-session";
 import path from "path";
+import multer from "multer";
+import * as XLSX from "xlsx";
+import fs from "fs";
 import { PrismaClient } from "@prisma/client";
 import passport from "./auth/passport";
 import { requireAuth, requireAdmin } from "./auth/middleware";
@@ -16,6 +19,36 @@ import { ChatMessage } from "./llm/LLMProvider";
 
 const app = express();
 const prisma = new PrismaClient();
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    // Accept Excel files only
+    const allowedMimes = [
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only Excel files (.xls, .xlsx) are allowed"));
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+});
 
 app.use(bodyParser.json());
 
@@ -476,6 +509,145 @@ app.post("/analyst/polish", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Error polishing text:", error);
     res.status(500).json({ error: "Polishing failed" });
+  }
+});
+
+// Upload Excel file endpoint
+app.post("/analyst/upload-excel", requireAuth, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const { projectId } = req.body;
+
+    if (!projectId) {
+      // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: "projectId is required" });
+    }
+
+    const user = req.user as any;
+
+    // Verify project ownership
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        company: {
+          userId: user.id,
+        },
+      },
+    });
+
+    if (!project) {
+      // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    // Read and parse the Excel file
+    const workbook = XLSX.readFile(req.file.path);
+    const result: any = {
+      filename: req.file.originalname,
+      sheets: {},
+      summary: "",
+    };
+
+    // Process each sheet
+    workbook.SheetNames.forEach((sheetName) => {
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      result.sheets[sheetName] = jsonData;
+    });
+
+    // Generate a summary of the Excel content
+    let summaryParts: string[] = [];
+    summaryParts.push(`📊 Excel File: ${req.file.originalname}`);
+    summaryParts.push(`\nNumber of sheets: ${workbook.SheetNames.length}`);
+    
+    workbook.SheetNames.forEach((sheetName) => {
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+      
+      summaryParts.push(`\n\n📄 Sheet: "${sheetName}"`);
+      summaryParts.push(`Rows: ${jsonData.length}`);
+      
+      if (jsonData.length > 0) {
+        const firstRow = jsonData[0] as any[];
+        summaryParts.push(`Columns: ${firstRow.length}`);
+        
+        // Show column headers if available
+        if (firstRow.length > 0) {
+          summaryParts.push(`\nColumn Headers:`);
+          firstRow.forEach((header, idx) => {
+            if (header) {
+              summaryParts.push(`  ${idx + 1}. ${header}`);
+            }
+          });
+        }
+        
+        // Show first few rows as sample data
+        if (jsonData.length > 1) {
+          summaryParts.push(`\nSample Data (first ${Math.min(3, jsonData.length - 1)} rows):`);
+          const sampleRows = jsonData.slice(1, Math.min(4, jsonData.length));
+          sampleRows.forEach((row: any[], rowIdx) => {
+            summaryParts.push(`  Row ${rowIdx + 2}: ${JSON.stringify(row)}`);
+          });
+        }
+      }
+    });
+
+    result.summary = summaryParts.join("\n");
+
+    // Add the spreadsheet information to the chat history
+    let chatSession = await prisma.chatSession.findFirst({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (chatSession) {
+      const history = JSON.parse(chatSession.history as string) as ChatMessage[];
+      
+      // Create a detailed message about the spreadsheet upload
+      const spreadsheetMessage = `[SYSTEM: User uploaded a spreadsheet file]\n\n${result.summary}`;
+      
+      // Add the spreadsheet info as a user message
+      history.push({
+        role: "user",
+        content: spreadsheetMessage,
+      });
+
+      // Add an acknowledgment from the assistant
+      const acknowledgment = await llm.chat({
+        messages: history,
+        temperature: 0.4,
+      });
+
+      history.push({
+        role: "assistant",
+        content: acknowledgment,
+      });
+
+      // Save the updated history
+      await prisma.chatSession.update({
+        where: { id: chatSession.id },
+        data: { history: JSON.stringify(history) },
+      });
+    }
+
+    // Clean up the uploaded file after processing
+    fs.unlinkSync(req.file.path);
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error processing Excel file:", error);
+    
+    // Clean up file if it exists
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({ error: "Failed to process Excel file" });
   }
 });
 
