@@ -664,6 +664,51 @@
             box-shadow: none;
         }
 
+        #voice-btn {
+            background: #f59e0b;
+            color: white;
+            box-shadow: 0 3px 10px rgba(245,158,11,0.3);
+        }
+
+        #voice-btn:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245,158,11,0.4);
+        }
+
+        #voice-btn:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        #voice-btn.recording {
+            background: #dc2626;
+            box-shadow: 0 3px 10px rgba(220,38,38,0.4);
+            animation: voicePulse 1.5s ease-in-out infinite;
+        }
+
+        #voice-btn.recording:hover {
+            background: #b91c1c;
+        }
+
+        @keyframes voicePulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.85;
+                transform: scale(1.05);
+            }
+        }
+
+        #voice-btn.not-supported {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
         .message-attachment {
             margin-top: 0.5rem;
             max-width: 100%;
@@ -1614,7 +1659,11 @@
                             accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" 
                             style="display: none;"
                         />
-                    </div>                    <div class="button-row-right">
+                    </div>
+                    <div class="button-row-right">
+                        <button id="voice-btn">
+                            <span class="material-symbols-outlined">mic</span>Voice
+                        </button>
                         <button id="polish-btn">Polish</button>
                         <button id="send-btn">Send</button>
                     </div>

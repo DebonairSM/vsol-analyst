@@ -3,6 +3,8 @@ let currentUser = null;
 let currentProject = null;
 let isProcessing = false;
 let isInitialLoad = true;
+let recognition = null;
+let isRecording = false;
 
 // DOM Elements
 const loginPage = document.getElementById('login-page');
@@ -20,6 +22,7 @@ const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const polishBtn = document.getElementById('polish-btn');
 const extractBtn = document.getElementById('extract-btn');
+const voiceBtn = document.getElementById('voice-btn');
 const markdownOutput = document.getElementById('markdown-output');
 const mermaidOutput = document.getElementById('mermaid-output');
 const newProjectModal = document.getElementById('new-project-modal');
@@ -45,6 +48,9 @@ function configureAvatarElement(avatarEl, size = 36) {
 
 // Initialize app
 async function init() {
+    // Check voice support on page load
+    checkVoiceSupport();
+    
     try {
         const response = await fetch('/auth/me');
         if (response.ok) {
@@ -234,11 +240,17 @@ async function createProject() {
 }
 
 function backToProjects() {
+    // Stop recording if active
+    if (isRecording) {
+        stopRecording();
+    }
+    
     // Re-enable input if it was disabled for admin view
     messageInput.disabled = false;
     sendBtn.disabled = false;
     polishBtn.disabled = false;
     extractBtn.disabled = false;
+    voiceBtn.disabled = false;
     messageInput.placeholder = 'Tell me about your business...';
     
     // Check if we were in admin view
@@ -484,9 +496,15 @@ async function sendMessage() {
     const message = messageInput.value.trim();
     if (!message || isProcessing || !currentProject) return;
     
+    // Stop recording if active
+    if (isRecording) {
+        stopRecording();
+    }
+    
     isProcessing = true;
     sendBtn.disabled = true;
     extractBtn.disabled = true;
+    voiceBtn.disabled = true;
     
     addMessage('user', message);
     messageInput.value = '';
@@ -524,6 +542,7 @@ async function sendMessage() {
     isProcessing = false;
     sendBtn.disabled = false;
     extractBtn.disabled = false;
+    voiceBtn.disabled = false;
     messageInput.focus();
 }
 
@@ -573,9 +592,15 @@ async function extractRequirements() {
 }
 
 async function performExtraction() {
+    // Stop recording if active
+    if (isRecording) {
+        stopRecording();
+    }
+    
     isProcessing = true;
     sendBtn.disabled = true;
     extractBtn.disabled = true;
+    voiceBtn.disabled = true;
     
     // Show modal with loading animation
     showOutputModal();
@@ -613,6 +638,7 @@ async function performExtraction() {
     isProcessing = false;
     sendBtn.disabled = false;
     extractBtn.disabled = false;
+    voiceBtn.disabled = false;
 }
 
 function copyMarkdown(event) {
@@ -821,7 +847,13 @@ async function viewProjectChat(projectId) {
         sendBtn.disabled = true;
         polishBtn.disabled = true;
         extractBtn.disabled = true;
+        voiceBtn.disabled = true;
         messageInput.placeholder = 'Admin view - read only';
+        
+        // Stop recording if active
+        if (isRecording) {
+            stopRecording();
+        }
         
         // Display chat history
         if (project.sessions.length > 0) {
@@ -853,10 +885,16 @@ async function polishText() {
         return;
     }
     
+    // Stop recording if active
+    if (isRecording) {
+        stopRecording();
+    }
+    
     isProcessing = true;
     sendBtn.disabled = true;
     polishBtn.disabled = true;
     extractBtn.disabled = true;
+    voiceBtn.disabled = true;
     
     // Show modal with loading animation
     showPolishModal();
@@ -899,6 +937,7 @@ async function polishText() {
     sendBtn.disabled = false;
     polishBtn.disabled = false;
     extractBtn.disabled = false;
+    voiceBtn.disabled = false;
 }
 
 function showPolishModal() {
@@ -984,12 +1023,18 @@ async function handleExcelUpload(event) {
         return;
     }
     
+    // Stop recording if active
+    if (isRecording) {
+        stopRecording();
+    }
+    
     isProcessing = true;
     sendBtn.disabled = true;
     polishBtn.disabled = true;
     extractBtn.disabled = true;
     uploadExcelBtn.disabled = true;
     uploadImageBtn.disabled = true;
+    voiceBtn.disabled = true;
     
     // Show uploading message
     addMessage('user', `Uploading Excel: ${file.name}`);
@@ -1040,6 +1085,7 @@ async function handleExcelUpload(event) {
     extractBtn.disabled = false;
     uploadExcelBtn.disabled = false;
     uploadImageBtn.disabled = false;
+    voiceBtn.disabled = false;
     messageInput.focus();
 }
 
@@ -1063,12 +1109,18 @@ async function handleImageUpload(event) {
         return;
     }
     
+    // Stop recording if active
+    if (isRecording) {
+        stopRecording();
+    }
+    
     isProcessing = true;
     sendBtn.disabled = true;
     polishBtn.disabled = true;
     extractBtn.disabled = true;
     uploadExcelBtn.disabled = true;
     uploadImageBtn.disabled = true;
+    voiceBtn.disabled = true;
     
     // Show uploading message
     addMessage('user', `Uploading image: ${file.name}`);
@@ -1114,7 +1166,160 @@ async function handleImageUpload(event) {
     extractBtn.disabled = false;
     uploadExcelBtn.disabled = false;
     uploadImageBtn.disabled = false;
+    voiceBtn.disabled = false;
     messageInput.focus();
+}
+
+// Speech Recognition Functions
+function initSpeechRecognition() {
+    // Check for browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        console.warn('Speech recognition not supported in this browser');
+        return null;
+    }
+    
+    try {
+        const recognitionInstance = new SpeechRecognition();
+        recognitionInstance.continuous = true;  // Keep listening
+        recognitionInstance.interimResults = true;  // Show results in real-time
+        recognitionInstance.lang = 'en-US';
+        recognitionInstance.maxAlternatives = 1;
+        
+        recognitionInstance.onstart = () => {
+            console.log('Speech recognition started');
+            isRecording = true;
+            voiceBtn.classList.add('recording');
+            voiceBtn.innerHTML = '<span class="material-symbols-outlined">stop_circle</span>Stop';
+        };
+        
+        recognitionInstance.onresult = (event) => {
+            let interimTranscript = '';
+            let finalTranscript = '';
+            
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript + ' ';
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+            
+            // Update textarea with transcribed text
+            if (finalTranscript) {
+                const currentValue = messageInput.value;
+                const needsSpace = currentValue && !currentValue.endsWith(' ') && !currentValue.endsWith('\n');
+                messageInput.value = currentValue + (needsSpace ? ' ' : '') + finalTranscript;
+                
+                // Auto-scroll to bottom of textarea
+                messageInput.scrollTop = messageInput.scrollHeight;
+            }
+        };
+        
+        recognitionInstance.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            
+            // Handle specific error cases
+            if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                alert('Microphone access denied. Please enable microphone permissions in your browser settings.');
+            } else if (event.error === 'no-speech') {
+                console.log('No speech detected');
+            } else if (event.error === 'network') {
+                alert('Network error occurred. Please check your connection.');
+            }
+            
+            stopRecording();
+        };
+        
+        recognitionInstance.onend = () => {
+            console.log('Speech recognition ended');
+            if (isRecording) {
+                // If we were recording and it ended unexpectedly, update UI
+                stopRecording();
+            }
+        };
+        
+        return recognitionInstance;
+    } catch (error) {
+        console.error('Error initializing speech recognition:', error);
+        return null;
+    }
+}
+
+function toggleRecording() {
+    if (isProcessing || !currentProject) return;
+    
+    if (!recognition) {
+        recognition = initSpeechRecognition();
+    }
+    
+    if (!recognition) {
+        alert('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari for voice input.');
+        voiceBtn.classList.add('not-supported');
+        voiceBtn.disabled = true;
+        return;
+    }
+    
+    if (isRecording) {
+        stopRecording();
+    } else {
+        startRecording();
+    }
+}
+
+function startRecording() {
+    if (!recognition || isProcessing) return;
+    
+    try {
+        recognition.start();
+        // UI updates happen in onstart handler
+    } catch (error) {
+        console.error('Error starting recognition:', error);
+        if (error.name === 'InvalidStateError') {
+            // Already started, just update UI
+            isRecording = true;
+            voiceBtn.classList.add('recording');
+            voiceBtn.innerHTML = '<span class="material-symbols-outlined">stop_circle</span>Stop';
+        } else {
+            alert('Failed to start voice recognition. Please try again.');
+        }
+    }
+}
+
+function stopRecording() {
+    if (recognition && isRecording) {
+        try {
+            recognition.stop();
+        } catch (error) {
+            console.error('Error stopping recognition:', error);
+        }
+        
+        isRecording = false;
+        voiceBtn.classList.remove('recording');
+        voiceBtn.innerHTML = '<span class="material-symbols-outlined">mic</span>Voice';
+        messageInput.focus();
+    }
+}
+
+// Check browser support on load
+function checkVoiceSupport() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        // Hide or disable voice button for unsupported browsers
+        voiceBtn.classList.add('not-supported');
+        voiceBtn.title = 'Voice input not supported in this browser. Try Chrome, Edge, or Safari.';
+        
+        // Show a subtle message on click
+        voiceBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (confirm('Voice input is not supported in Firefox on desktop. Would you like to learn more about browser compatibility?')) {
+                window.open('https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API#browser_compatibility', '_blank');
+            }
+        });
+    }
 }
 
 // Event listeners
@@ -1125,6 +1330,7 @@ uploadExcelBtn.addEventListener('click', uploadExcel);
 excelFileInput.addEventListener('change', handleExcelUpload);
 uploadImageBtn.addEventListener('click', uploadImage);
 imageFileInput.addEventListener('change', handleImageUpload);
+voiceBtn.addEventListener('click', toggleRecording);
 
 messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
