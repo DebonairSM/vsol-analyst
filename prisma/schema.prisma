@@ -15,6 +15,7 @@ model User {
   googleId  String    @unique
   name      String
   email     String    @unique
+  picture   String?
   isAdmin   Boolean   @default(false)
   companies Company[]
   createdAt DateTime  @default(now())

@@ -19,7 +19,6 @@ const chatContainer = document.getElementById('chat-container');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const extractBtn = document.getElementById('extract-btn');
-const outputContainer = document.getElementById('output-container');
 const markdownOutput = document.getElementById('markdown-output');
 const mermaidOutput = document.getElementById('mermaid-output');
 const newProjectModal = document.getElementById('new-project-modal');
@@ -108,7 +107,6 @@ async function showChat(project) {
     currentProject = project;
     projectTitle.textContent = project.name;
     chatContainer.innerHTML = '';
-    outputContainer.classList.remove('visible');
     
     loginPage.classList.add('hidden');
     projectsPage.classList.remove('visible');
@@ -280,11 +278,17 @@ function addMessage(role, content) {
     const headerDiv = document.createElement('div');
     headerDiv.className = 'message-header';
     
-    // Add avatar for assistant messages
+    // Add avatar for both user and assistant messages
     if (role === 'assistant') {
         const avatar = document.createElement('img');
         avatar.src = '/assets/sunny-face.png';
         avatar.alt = 'Sunny';
+        avatar.className = 'message-avatar';
+        headerDiv.appendChild(avatar);
+    } else if (role === 'user' && currentUser && currentUser.picture) {
+        const avatar = document.createElement('img');
+        avatar.src = currentUser.picture;
+        avatar.alt = currentUser.name;
         avatar.className = 'message-avatar';
         headerDiv.appendChild(avatar);
     }
@@ -367,14 +371,58 @@ async function sendMessage() {
     messageInput.focus();
 }
 
+function showConfirmExtractModal() {
+    const modal = document.getElementById('confirm-extract-modal');
+    modal.classList.add('visible');
+}
+
+function hideConfirmExtractModal() {
+    const modal = document.getElementById('confirm-extract-modal');
+    modal.classList.remove('visible');
+}
+
+function confirmExtract() {
+    hideConfirmExtractModal();
+    performExtraction();
+}
+
+function showOutputModal() {
+    const modal = document.getElementById('output-modal');
+    const loadingDiv = document.getElementById('extraction-loading');
+    const resultsDiv = document.getElementById('extraction-results');
+    
+    // Show loading state
+    loadingDiv.style.display = 'block';
+    resultsDiv.style.display = 'none';
+    modal.classList.add('visible');
+}
+
+function showOutputResults() {
+    const loadingDiv = document.getElementById('extraction-loading');
+    const resultsDiv = document.getElementById('extraction-results');
+    
+    // Switch to results state
+    loadingDiv.style.display = 'none';
+    resultsDiv.style.display = 'block';
+}
+
+function hideOutputModal() {
+    const modal = document.getElementById('output-modal');
+    modal.classList.remove('visible');
+}
+
 async function extractRequirements() {
     if (isProcessing || !currentProject) return;
-    
+    showConfirmExtractModal();
+}
+
+async function performExtraction() {
     isProcessing = true;
     sendBtn.disabled = true;
     extractBtn.disabled = true;
     
-    showLoading();
+    // Show modal with loading animation
+    showOutputModal();
     
     try {
         const response = await fetch('/analyst/extract', {
@@ -385,6 +433,7 @@ async function extractRequirements() {
         
         if (!response.ok) {
             if (response.status === 401) {
+                hideOutputModal();
                 alert('Session expired. Please login again.');
                 showLogin();
                 return;
@@ -393,15 +442,14 @@ async function extractRequirements() {
         }
         
         const data = await response.json();
-        removeLoading();
         
         markdownOutput.value = data.markdown;
         mermaidOutput.value = data.mermaid;
-        outputContainer.classList.add('visible');
         
-        addMessage('assistant', 'Requirements extracted! You can now download the documents below.');
+        // Switch modal to show results
+        showOutputResults();
     } catch (error) {
-        removeLoading();
+        hideOutputModal();
         addMessage('assistant', 'Sorry, I could not extract requirements. Please continue the conversation.');
         console.error('Error:', error);
     }
@@ -409,6 +457,40 @@ async function extractRequirements() {
     isProcessing = false;
     sendBtn.disabled = false;
     extractBtn.disabled = false;
+}
+
+function copyMarkdown() {
+    const content = markdownOutput.value;
+    navigator.clipboard.writeText(content).then(() => {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy to clipboard');
+    });
+}
+
+function copyMermaid() {
+    const content = mermaidOutput.value;
+    navigator.clipboard.writeText(content).then(() => {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy to clipboard');
+    });
 }
 
 function downloadMarkdown() {
@@ -572,7 +654,6 @@ async function viewProjectChat(projectId) {
         currentProject = { id: project.id, name: project.name, isAdminView: true };
         projectTitle.textContent = `${project.name} (${project.company.user.name}) - Read Only`;
         chatContainer.innerHTML = '';
-        outputContainer.classList.remove('visible');
         
         loginPage.classList.add('hidden');
         projectsPage.classList.remove('visible');
@@ -617,6 +698,32 @@ newProjectNameInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
         createProject();
+    }
+});
+
+// Close modals when clicking outside
+document.getElementById('confirm-extract-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'confirm-extract-modal') {
+        hideConfirmExtractModal();
+    }
+});
+
+document.getElementById('output-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'output-modal') {
+        hideOutputModal();
+    }
+});
+
+// Close modal with Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const confirmModal = document.getElementById('confirm-extract-modal');
+        const outputModal = document.getElementById('output-modal');
+        if (confirmModal.classList.contains('visible')) {
+            hideConfirmExtractModal();
+        } else if (outputModal.classList.contains('visible')) {
+            hideOutputModal();
+        }
     }
 });
 

@@ -26,6 +26,7 @@ passport.use(
               googleId: profile.id,
               name: profile.displayName || "Unknown",
               email: profile.emails?.[0]?.value || "",
+              picture: profile.photos?.[0]?.value || null,
               companies: {
                 create: {
                   name: `${profile.displayName || "My"} Company`,
@@ -34,6 +35,15 @@ passport.use(
             },
             include: { companies: true },
           });
+        } else {
+          // Update existing user's picture if it changed
+          if (profile.photos?.[0]?.value && user.picture !== profile.photos[0].value) {
+            user = await prisma.user.update({
+              where: { id: user.id },
+              data: { picture: profile.photos[0].value },
+              include: { companies: true },
+            });
+          }
         }
 
         done(null, user);
