@@ -2,13 +2,17 @@
 let currentUser = null;
 let currentProject = null;
 let isProcessing = false;
+let isInitialLoad = true;
 
 // DOM Elements
 const loginPage = document.getElementById('login-page');
 const projectsPage = document.getElementById('projects-page');
+const adminPage = document.getElementById('admin-page');
 const chatPage = document.getElementById('chat-page');
 const userHeader = document.getElementById('user-header');
 const userName = document.getElementById('user-name');
+const adminBadge = document.getElementById('admin-badge');
+const adminViewBtn = document.getElementById('admin-view-btn');
 const projectsList = document.getElementById('projects-list');
 const projectTitle = document.getElementById('project-title');
 const chatContainer = document.getElementById('chat-container');
@@ -20,6 +24,7 @@ const markdownOutput = document.getElementById('markdown-output');
 const mermaidOutput = document.getElementById('mermaid-output');
 const newProjectModal = document.getElementById('new-project-modal');
 const newProjectNameInput = document.getElementById('new-project-name');
+const adminContent = document.getElementById('admin-content');
 
 // Initialize app
 async function init() {
@@ -28,7 +33,17 @@ async function init() {
         if (response.ok) {
             const data = await response.json();
             currentUser = data.user;
-            showProjects();
+            
+            // Handle initial URL routing
+            const hash = window.location.hash;
+            if (hash.startsWith('#/project/')) {
+                const projectId = hash.replace('#/project/', '');
+                await loadProjectFromUrl(projectId);
+            } else if (hash === '#/admin' && currentUser.isAdmin) {
+                showAdminDashboard();
+            } else {
+                showProjects();
+            }
         } else {
             showLogin();
         }
@@ -36,12 +51,30 @@ async function init() {
         console.error('Error checking auth:', error);
         showLogin();
     }
+    isInitialLoad = false;
+}
+
+// Load project from URL
+async function loadProjectFromUrl(projectId) {
+    try {
+        const response = await fetch(`/api/projects/${projectId}`);
+        if (response.ok) {
+            const data = await response.json();
+            await showChat(data.project);
+        } else {
+            showProjects();
+        }
+    } catch (error) {
+        console.error('Error loading project from URL:', error);
+        showProjects();
+    }
 }
 
 // Show/hide pages
 function showLogin() {
     loginPage.classList.remove('hidden');
     projectsPage.classList.remove('visible');
+    adminPage.style.display = 'none';
     chatPage.classList.remove('visible');
     userHeader.style.display = 'none';
 }
@@ -49,13 +82,29 @@ function showLogin() {
 function showProjects() {
     loginPage.classList.add('hidden');
     projectsPage.classList.add('visible');
+    adminPage.style.display = 'none';
     chatPage.classList.remove('visible');
     userHeader.style.display = 'flex';
     userName.textContent = currentUser.name;
+    
+    // Show admin badge and button if user is admin
+    if (currentUser.isAdmin) {
+        adminBadge.style.display = 'inline';
+        adminViewBtn.style.display = 'inline-block';
+    } else {
+        adminBadge.style.display = 'none';
+        adminViewBtn.style.display = 'none';
+    }
+    
+    // Update URL
+    if (!isInitialLoad) {
+        window.history.pushState({}, '', '#/projects');
+    }
+    
     loadProjects();
 }
 
-function showChat(project) {
+async function showChat(project) {
     currentProject = project;
     projectTitle.textContent = project.name;
     chatContainer.innerHTML = '';
@@ -63,10 +112,16 @@ function showChat(project) {
     
     loginPage.classList.add('hidden');
     projectsPage.classList.remove('visible');
+    adminPage.style.display = 'none';
     chatPage.classList.add('visible');
     
-    // Show welcome message
-    addMessage('assistant', `Hello! I'm your VSol Systems Analyst for "${project.name}". Tell me about your business, and I'll help you identify your requirements.`);
+    // Update URL
+    if (!isInitialLoad) {
+        window.history.pushState({}, '', `#/project/${project.id}`);
+    }
+    
+    // Load existing chat history
+    await loadChatHistory(project.id);
 }
 
 // Authentication
@@ -110,7 +165,7 @@ function displayProjects(projects) {
     projects.forEach(project => {
         const projectItem = document.createElement('div');
         projectItem.className = 'project-item';
-        projectItem.onclick = () => showChat(project);
+        projectItem.onclick = async () => await showChat(project);
         
         const nameDiv = document.createElement('div');
         nameDiv.className = 'project-name';
@@ -155,7 +210,7 @@ async function createProject() {
         
         const data = await response.json();
         hideNewProjectModal();
-        showChat(data.project);
+        await showChat(data.project);
     } catch (error) {
         console.error('Error creating project:', error);
         alert('Failed to create project');
@@ -163,11 +218,61 @@ async function createProject() {
 }
 
 function backToProjects() {
-    currentProject = null;
-    showProjects();
+    // Re-enable input if it was disabled for admin view
+    messageInput.disabled = false;
+    sendBtn.disabled = false;
+    extractBtn.disabled = false;
+    messageInput.placeholder = 'Tell me about your business...';
+    
+    // Check if we were in admin view
+    if (currentProject && currentProject.isAdminView) {
+        currentProject = null;
+        showAdminDashboard();
+    } else {
+        currentProject = null;
+        showProjects();
+    }
 }
 
 // Chat
+async function loadChatHistory(projectId) {
+    try {
+        const response = await fetch(`/api/projects/${projectId}`);
+        if (!response.ok) throw new Error('Failed to fetch project');
+        
+        const data = await response.json();
+        const project = data.project;
+        
+        // Display chat history if it exists
+        if (project.sessions && project.sessions.length > 0) {
+            const history = JSON.parse(project.sessions[0].history);
+            let hasMessages = false;
+            
+            history.forEach(msg => {
+                if (msg.role !== 'system') {
+                    addMessage(msg.role, msg.content);
+                    hasMessages = true;
+                }
+            });
+            
+            // If no messages were shown, show welcome message
+            if (!hasMessages) {
+                const firstName = currentUser.name.split(' ')[0];
+                addMessage('assistant', `Hello, ${firstName}! I'm your VSol Systems Analyst for "${project.name}". Tell me about your business, and I'll help you identify your requirements.`);
+            }
+        } else {
+            // No chat history, show welcome message
+            const firstName = currentUser.name.split(' ')[0];
+            addMessage('assistant', `Hello, ${firstName}! I'm your VSol Systems Analyst for "${project.name}". Tell me about your business, and I'll help you identify your requirements.`);
+        }
+    } catch (error) {
+        console.error('Error loading chat history:', error);
+        // Show welcome message as fallback
+        const firstName = currentUser.name.split(' ')[0];
+        addMessage('assistant', `Hello, ${firstName}! I'm your VSol Systems Analyst for "${currentProject.name}". Tell me about your business, and I'll help you identify your requirements.`);
+    }
+}
+
 function addMessage(role, content) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${role}`;
@@ -314,6 +419,175 @@ function downloadMermaid() {
     URL.revokeObjectURL(url);
 }
 
+// Admin Dashboard
+async function showAdminDashboard() {
+    if (!currentUser.isAdmin) return;
+    
+    loginPage.classList.add('hidden');
+    projectsPage.classList.remove('visible');
+    adminPage.style.display = 'flex';
+    chatPage.classList.remove('visible');
+    
+    // Update URL
+    if (!isInitialLoad) {
+        window.history.pushState({}, '', '#/admin');
+    }
+    
+    // Load admin stats
+    loadAdminStats();
+    
+    // Load users by default
+    switchAdminTab('users');
+}
+
+async function loadAdminStats() {
+    try {
+        const response = await fetch('/api/admin/stats');
+        if (!response.ok) throw new Error('Failed to fetch stats');
+        
+        const data = await response.json();
+        document.getElementById('stat-users').textContent = data.stats.users;
+        document.getElementById('stat-projects').textContent = data.stats.projects;
+        document.getElementById('stat-sessions').textContent = data.stats.sessions;
+    } catch (error) {
+        console.error('Error loading admin stats:', error);
+    }
+}
+
+async function switchAdminTab(tab) {
+    // Update tab buttons
+    document.getElementById('tab-users').classList.toggle('active', tab === 'users');
+    document.getElementById('tab-projects').classList.toggle('active', tab === 'projects');
+    
+    // Load content
+    if (tab === 'users') {
+        await loadAdminUsers();
+    } else if (tab === 'projects') {
+        await loadAdminProjects();
+    }
+}
+
+async function loadAdminUsers() {
+    adminContent.innerHTML = '<div class="empty-state">Loading users...</div>';
+    
+    try {
+        const response = await fetch('/api/admin/users');
+        if (!response.ok) throw new Error('Failed to fetch users');
+        
+        const data = await response.json();
+        displayAdminUsers(data.users);
+    } catch (error) {
+        console.error('Error loading users:', error);
+        adminContent.innerHTML = '<div class="empty-state">Failed to load users</div>';
+    }
+}
+
+function displayAdminUsers(users) {
+    if (users.length === 0) {
+        adminContent.innerHTML = '<div class="empty-state">No users found</div>';
+        return;
+    }
+    
+    adminContent.innerHTML = '';
+    users.forEach(user => {
+        const totalProjects = user.companies.reduce((sum, c) => sum + c.projects.length, 0);
+        
+        const userCard = document.createElement('div');
+        userCard.className = 'user-card';
+        userCard.innerHTML = `
+            <div class="user-card-header">
+                <div>
+                    <div class="user-card-name">${user.name}${user.isAdmin ? ' (Admin)' : ''}</div>
+                    <div class="user-card-email">${user.email}</div>
+                    <div class="user-card-stats">${totalProjects} project(s) • Joined ${new Date(user.createdAt).toLocaleDateString()}</div>
+                </div>
+            </div>
+        `;
+        adminContent.appendChild(userCard);
+    });
+}
+
+async function loadAdminProjects() {
+    adminContent.innerHTML = '<div class="empty-state">Loading projects...</div>';
+    
+    try {
+        const response = await fetch('/api/admin/projects');
+        if (!response.ok) throw new Error('Failed to fetch projects');
+        
+        const data = await response.json();
+        displayAdminProjects(data.projects);
+    } catch (error) {
+        console.error('Error loading projects:', error);
+        adminContent.innerHTML = '<div class="empty-state">Failed to load projects</div>';
+    }
+}
+
+function displayAdminProjects(projects) {
+    if (projects.length === 0) {
+        adminContent.innerHTML = '<div class="empty-state">No projects found</div>';
+        return;
+    }
+    
+    adminContent.innerHTML = '';
+    projects.forEach(project => {
+        const projectCard = document.createElement('div');
+        projectCard.className = 'admin-project-card';
+        projectCard.innerHTML = `
+            <div class="user-card-header">
+                <div>
+                    <div class="user-card-name">${project.name}</div>
+                    <div class="user-card-email">Client: ${project.company.user.name} (${project.company.user.email})</div>
+                    <div class="user-card-stats">${project.sessions.length} session(s) • Last updated ${new Date(project.updatedAt).toLocaleTimeString()} ${new Date(project.updatedAt).toLocaleDateString()}</div>
+                </div>
+                <button class="view-chat-btn" onclick="viewProjectChat('${project.id}')">View Chat</button>
+            </div>
+        `;
+        adminContent.appendChild(projectCard);
+    });
+}
+
+async function viewProjectChat(projectId) {
+    try {
+        const response = await fetch(`/api/admin/projects/${projectId}/chat`);
+        if (!response.ok) throw new Error('Failed to fetch project chat');
+        
+        const data = await response.json();
+        const project = data.project;
+        
+        // Switch to chat view with read-only mode
+        currentProject = { id: project.id, name: project.name, isAdminView: true };
+        projectTitle.textContent = `${project.name} (${project.company.user.name}) - Read Only`;
+        chatContainer.innerHTML = '';
+        outputContainer.classList.remove('visible');
+        
+        loginPage.classList.add('hidden');
+        projectsPage.classList.remove('visible');
+        adminPage.style.display = 'none';
+        chatPage.classList.add('visible');
+        
+        // Disable input for admin view
+        messageInput.disabled = true;
+        sendBtn.disabled = true;
+        extractBtn.disabled = true;
+        messageInput.placeholder = 'Admin view - read only';
+        
+        // Display chat history
+        if (project.sessions.length > 0) {
+            const history = project.sessions[0].history;
+            history.forEach(msg => {
+                if (msg.role !== 'system') {
+                    addMessage(msg.role, msg.content);
+                }
+            });
+        } else {
+            addMessage('assistant', 'No chat history available for this project.');
+        }
+    } catch (error) {
+        console.error('Error viewing project chat:', error);
+        alert('Failed to load project chat');
+    }
+}
+
 // Event listeners
 sendBtn.addEventListener('click', sendMessage);
 extractBtn.addEventListener('click', extractRequirements);
@@ -329,6 +603,21 @@ newProjectNameInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
         createProject();
+    }
+});
+
+// Handle browser back/forward buttons
+window.addEventListener('popstate', () => {
+    if (!currentUser) return;
+    
+    const hash = window.location.hash;
+    if (hash.startsWith('#/project/')) {
+        const projectId = hash.replace('#/project/', '');
+        loadProjectFromUrl(projectId);
+    } else if (hash === '#/admin' && currentUser.isAdmin) {
+        showAdminDashboard();
+    } else {
+        showProjects();
     }
 });
 

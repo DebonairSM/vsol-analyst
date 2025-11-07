@@ -6,6 +6,7 @@ AI-powered business requirements discovery tool using OpenAI with Google authent
 
 - Google OAuth authentication
 - Per-user project management
+- Admin dashboard to monitor all client sessions
 - Interactive chat with customers to understand their workflows
 - Automatic extraction of structured requirements from conversations
 - Generate requirements documents in Markdown format
@@ -34,6 +35,7 @@ DATABASE_URL=file:./dev.db
 # Google OAuth Credentials
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
+CALLBACK_URL=http://localhost:5051/auth/google/callback
 
 # Session Secret (use a random string in production)
 SESSION_SECRET=random-secret-string-change-in-production
@@ -57,7 +59,11 @@ Get your API key from: https://platform.openai.com/api-keys
    - Add authorized redirect URI: `http://localhost:5051/auth/google/callback`
    - Copy the Client ID and Client Secret to your `.env` file
 
-**Note:** The `.env` file is in `.gitignore` and will not be committed.
+**Important Notes:**
+- The `.env` file is in `.gitignore` and will not be committed.
+- Always access the application via `http://localhost:5051` (not via IP addresses like 192.168.1.65)
+- If you see a "device_id and device_name are required" error, you're trying to access the app via a private IP address. Use `localhost` instead.
+- In Google Cloud Console, make sure the authorized redirect URI is exactly: `http://localhost:5051/auth/google/callback`
 
 ### 3. Initialize Database
 
@@ -81,16 +87,40 @@ npm run dev
 
 The server will start on port 5051 and serve the application at http://localhost:5051
 
+### 5. Set Up Admin Access (Optional)
+
+To access the admin dashboard and view all client sessions:
+
+1. First, log in with your Google account at http://localhost:5051
+2. Open Prisma Studio to modify your user record:
+   ```bash
+   npx prisma studio
+   ```
+3. Navigate to the `User` table
+4. Find your user record and set `isAdmin` to `true`
+5. Refresh your browser
+
+You'll now see an "ADMIN" badge in the header and an "Admin Dashboard" button on the projects page.
+
 ## Usage
 
 ### Web Interface
 
+**For Clients:**
 1. Open http://localhost:5051 in your browser
 2. Sign in with your Google account
 3. Create a new project or select an existing one
 4. Start chatting with the analyst agent about your business
 5. When ready, click "Extract Requirements" to generate structured output
 6. Download the requirements.md and workflow.mmd files
+
+**For Admins:**
+1. After setting up admin access (see Setup section), log in
+2. Click "Admin Dashboard" button on your projects page
+3. View system statistics (total users, projects, sessions)
+4. Browse all users and their projects
+5. View any client's chat history in read-only mode
+6. Monitor client conversations and review extracted requirements
 
 ### Database Management
 
@@ -117,6 +147,13 @@ This opens a visual interface at http://localhost:5555 to browse and edit your d
 - `POST /api/projects` - Create new project (requires `{ name: string }`)
 - `GET /api/projects/:id` - Get project details
 - `PATCH /api/projects/:id` - Update project (requires `{ name: string }`)
+
+### Admin (requires admin role)
+
+- `GET /api/admin/stats` - Get system statistics (user count, project count, session count)
+- `GET /api/admin/users` - List all users with their projects
+- `GET /api/admin/projects` - List all projects from all users
+- `GET /api/admin/projects/:id/chat` - View chat history for any project
 
 ### Chat & Analysis
 
@@ -193,12 +230,30 @@ vsol-analyst/
 ## Database Schema
 
 - **User**: Stores user info from Google OAuth
+  - `isAdmin` flag for admin access (default: false)
   - Auto-creates a default Company on first login
 - **Company**: Organizational container (one per user initially)
 - **Project**: User's individual projects
   - Each project has its own chat sessions
 - **ChatSession**: Stores conversation history as JSON
   - Linked to a specific project
+
+## User Roles
+
+The system supports two roles:
+
+1. **Client Users** (default):
+   - Can create and manage their own projects
+   - Can chat with the analyst about their business
+   - Can extract and download requirements
+   - Only see their own data
+
+2. **Admin Users**:
+   - All client user capabilities
+   - Access admin dashboard with system statistics
+   - View all users and their projects
+   - Monitor any client's chat sessions (read-only)
+   - Review extracted requirements from all projects
 
 ## Deployment
 
@@ -225,6 +280,41 @@ When ready to deploy to Render or similar cloud platforms:
    ```
 
 The Prisma schema is designed to work with both SQLite and PostgreSQL with minimal changes.
+
+## Troubleshooting
+
+### Google OAuth Error: "device_id and device_name are required"
+
+If you see this error when trying to sign in:
+
+```
+Access blocked: Authorization Error
+device_id and device_name are required for private IP: http://192.168.1.65:5051/auth/google/callback
+Error 400: invalid_request
+```
+
+**Solution:**
+
+1. Make sure you added `CALLBACK_URL=http://localhost:5051/auth/google/callback` to your `.env` file
+2. Access the application via `http://localhost:5051` instead of using an IP address (like `http://192.168.1.65:5051`)
+3. In Google Cloud Console, verify the authorized redirect URI is set to `http://localhost:5051/auth/google/callback`
+4. Restart your development server after updating `.env`
+
+Google OAuth blocks authentication from private IP addresses in development. Always use `localhost` for local development.
+
+### Other Common Issues
+
+**"Not authenticated" errors:**
+- Check that SESSION_SECRET is set in your `.env` file
+- Clear your browser cookies and try logging in again
+
+**Database errors:**
+- Run `npx prisma migrate dev` to ensure your database is up to date
+- Check that DATABASE_URL is correctly set in `.env`
+
+**OpenAI API errors:**
+- Verify your OPENAI_API_KEY is valid at https://platform.openai.com/api-keys
+- Check that you have available credits in your OpenAI account
 
 ## Future Enhancements
 

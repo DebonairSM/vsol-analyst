@@ -49,9 +49,37 @@
 
         .user-info {
             display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+            font-size: 0.9rem;
+        }
+
+        .user-name-line {
+            display: flex;
             align-items: center;
             gap: 0.5rem;
-            font-size: 0.9rem;
+        }
+
+        .admin-role-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            animation: glow 2s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% {
+                box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            }
+            50% {
+                box-shadow: 0 2px 12px rgba(102, 126, 234, 0.6);
+            }
         }
 
         .logout-btn {
@@ -136,6 +164,13 @@
 
         #projects-page.visible {
             display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        /* Admin Dashboard */
+        #admin-page {
+            display: none;
             flex-direction: column;
             height: 100%;
         }
@@ -459,6 +494,73 @@
         .create-btn:hover {
             background: #229954;
         }
+
+        /* Admin Tabs */
+        .admin-tab {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: none;
+            color: #7f8c8d;
+            cursor: pointer;
+            font-size: 0.95rem;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .admin-tab:hover {
+            color: #2c3e50;
+        }
+
+        .admin-tab.active {
+            color: #e74c3c;
+            border-bottom-color: #e74c3c;
+        }
+
+        .user-card, .admin-project-card {
+            padding: 1rem;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .user-card:last-child, .admin-project-card:last-child {
+            border-bottom: none;
+        }
+
+        .user-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .user-card-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .user-card-email {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+
+        .user-card-stats {
+            font-size: 0.85rem;
+            color: #95a5a6;
+            margin-top: 0.25rem;
+        }
+
+        .view-chat-btn {
+            background: #3498db;
+            color: white;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .view-chat-btn:hover {
+            background: #2980b9;
+        }
     </style>
 </head>
 <body>
@@ -469,7 +571,10 @@
         </div>
         <div class="header-right" id="user-header" style="display: none;">
             <div class="user-info">
-                <span id="user-name"></span>
+                <div class="user-name-line">
+                    <span id="user-name"></span>
+                </div>
+                <span id="admin-badge" class="admin-role-badge" style="display: none;">Agentic Master</span>
             </div>
             <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
@@ -497,11 +602,48 @@
         <!-- Projects Dashboard -->
         <div id="projects-page">
             <div class="projects-header">
-                <h2>Your Projects</h2>
-                <button class="new-project-btn" onclick="showNewProjectModal()">+ New Project</button>
+                <h2 id="projects-page-title">Your Projects</h2>
+                <div>
+                    <button id="admin-view-btn" class="new-project-btn" onclick="showAdminDashboard()" style="display: none; margin-right: 0.5rem; background: #e74c3c;">Admin Dashboard</button>
+                    <button class="new-project-btn" onclick="showNewProjectModal()">+ New Project</button>
+                </div>
             </div>
             <div class="projects-list" id="projects-list">
                 <div class="empty-state">Loading projects...</div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="admin-page" style="display: none;">
+            <div class="projects-header">
+                <h2>Admin Dashboard</h2>
+                <button class="back-btn" onclick="backToProjects()">← Back to My Projects</button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem;">
+                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.85rem; color: #7f8c8d; margin-bottom: 0.5rem;">Total Users</div>
+                    <div id="stat-users" style="font-size: 2rem; font-weight: 600; color: #2c3e50;">-</div>
+                </div>
+                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.85rem; color: #7f8c8d; margin-bottom: 0.5rem;">Total Projects</div>
+                    <div id="stat-projects" style="font-size: 2rem; font-weight: 600; color: #2c3e50;">-</div>
+                </div>
+                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.85rem; color: #7f8c8d; margin-bottom: 0.5rem;">Total Sessions</div>
+                    <div id="stat-sessions" style="font-size: 2rem; font-weight: 600; color: #2c3e50;">-</div>
+                </div>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1rem;">
+                <div style="display: flex; gap: 0.5rem; border-bottom: 1px solid #ecf0f1; padding-bottom: 0.5rem;">
+                    <button id="tab-users" class="admin-tab active" onclick="switchAdminTab('users')">Users</button>
+                    <button id="tab-projects" class="admin-tab" onclick="switchAdminTab('projects')">All Projects</button>
+                </div>
+            </div>
+
+            <div id="admin-content" style="background: white; border-radius: 8px; padding: 1.5rem; flex: 1; overflow-y: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <div class="empty-state">Loading...</div>
             </div>
         </div>
 

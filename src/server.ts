@@ -7,7 +7,7 @@ import session from "express-session";
 import path from "path";
 import { PrismaClient } from "@prisma/client";
 import passport from "./auth/passport";
-import { requireAuth } from "./auth/middleware";
+import { requireAuth, requireAdmin } from "./auth/middleware";
 import { OpenAILLMProvider } from "./llm/OpenAILLMProvider";
 import { RequirementsExtractor } from "./analyst/RequirementsExtractor";
 import { DocumentGenerator } from "./analyst/DocumentGenerator";
@@ -208,6 +208,114 @@ app.patch("/api/projects/:id", requireAuth, async (req, res) => {
   }
 });
 
+// ========== Admin Routes ==========
+
+// Get admin dashboard stats
+app.get("/api/admin/stats", requireAdmin, async (req, res) => {
+  try {
+    const [userCount, projectCount, sessionCount] = await Promise.all([
+      prisma.user.count(),
+      prisma.project.count(),
+      prisma.chatSession.count(),
+    ]);
+
+    res.json({
+      stats: {
+        users: userCount,
+        projects: projectCount,
+        sessions: sessionCount,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching stats:", error);
+    res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+// List all users
+app.get("/api/admin/users", requireAdmin, async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      include: {
+        companies: {
+          include: {
+            projects: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json({ users });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+// List all projects (from all users)
+app.get("/api/admin/projects", requireAdmin, async (req, res) => {
+  try {
+    const projects = await prisma.project.findMany({
+      include: {
+        company: {
+          include: {
+            user: true,
+          },
+        },
+        sessions: true,
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    res.json({ projects });
+  } catch (error) {
+    console.error("Error fetching all projects:", error);
+    res.status(500).json({ error: "Failed to fetch projects" });
+  }
+});
+
+// View specific project's chat history
+app.get("/api/admin/projects/:id/chat", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const project = await prisma.project.findUnique({
+      where: { id },
+      include: {
+        company: {
+          include: {
+            user: true,
+          },
+        },
+        sessions: {
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    // Parse chat history
+    const sessions = project.sessions.map((session) => ({
+      ...session,
+      history: JSON.parse(session.history as string),
+    }));
+
+    res.json({
+      project: {
+        ...project,
+        sessions,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching project chat:", error);
+    res.status(500).json({ error: "Failed to fetch project chat" });
+  }
+});
+
 // ========== Chat & Analysis Routes ==========
 
 // Chat endpoint
@@ -247,8 +355,9 @@ app.post("/analyst/chat", requireAuth, async (req, res) => {
     let history: ChatMessage[];
 
     if (!chatSession) {
-      // Create new session
-      history = [{ role: "system", content: SYSTEM_PROMPT_ANALYST }];
+      // Create new session with user's first name
+      const firstName = user.name.split(" ")[0];
+      history = [{ role: "system", content: SYSTEM_PROMPT_ANALYST(firstName) }];
       chatSession = await prisma.chatSession.create({
         data: {
           projectId,
