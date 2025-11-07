@@ -21,9 +21,9 @@ const app = express();
 const prisma = new PrismaClient();
 
 // Configure multer for file uploads
-const storage = multer.diskStorage({
+const imageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/");
+    cb(null, "uploads/images/");
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -31,8 +31,40 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({
-  storage: storage,
+const spreadsheetStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/spreadsheets/");
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  },
+});
+
+const uploadImage = multer({
+  storage: imageStorage,
+  fileFilter: (req, file, cb) => {
+    // Accept image files
+    const allowedMimes = [
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
+      "image/gif",
+      "image/webp",
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files (PNG, JPG, GIF, WebP) are allowed"));
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+});
+
+const uploadSpreadsheet = multer({
+  storage: spreadsheetStorage,
   fileFilter: (req, file, cb) => {
     // Accept Excel files only
     const allowedMimes = [
@@ -247,6 +279,55 @@ app.patch("/api/projects/:id", requireAuth, async (req, res) => {
   }
 });
 
+// ========== Attachment Routes ==========
+
+// Serve attachment files
+app.get("/api/attachments/:id", requireAuth, async (req, res) => {
+  try {
+    const user = req.user as any;
+    const { id } = req.params;
+
+    // Get attachment with session info to verify ownership
+    const attachment = await prisma.attachment.findUnique({
+      where: { id },
+      include: {
+        session: {
+          include: {
+            project: {
+              include: {
+                company: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!attachment) {
+      return res.status(404).json({ error: "Attachment not found" });
+    }
+
+    // Verify user owns the project
+    if (attachment.session.project.company.userId !== user.id) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Serve the file
+    const filePath = path.resolve(attachment.storedPath);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "File not found on disk" });
+    }
+
+    res.setHeader("Content-Type", attachment.mimeType);
+    res.setHeader("Content-Disposition", `inline; filename="${attachment.filename}"`);
+    res.sendFile(filePath);
+  } catch (error) {
+    console.error("Error serving attachment:", error);
+    res.status(500).json({ error: "Failed to serve attachment" });
+  }
+});
+
 // ========== Admin Routes ==========
 
 // Get admin dashboard stats
@@ -410,10 +491,19 @@ app.post("/analyst/chat", requireAuth, async (req, res) => {
     // Add user message
     history.push({ role: "user", content: message });
 
-    // Get AI reply
+    // Create attachment resolver function
+    const resolveAttachment = async (attachmentId: string): Promise<string | null> => {
+      const attachment = await prisma.attachment.findUnique({
+        where: { id: attachmentId },
+      });
+      return attachment ? attachment.storedPath : null;
+    };
+
+    // Get AI reply with attachment resolution
     const reply = await llm.chat({
       messages: history,
       temperature: 0.4,
+      resolveAttachment,
     });
 
     // Add assistant reply
@@ -443,7 +533,7 @@ app.post("/analyst/extract", requireAuth, async (req, res) => {
 
     const user = req.user as any;
 
-    // Verify project ownership and get latest session
+    // Verify project ownership and get latest session with attachments
     const project = await prisma.project.findFirst({
       where: {
         id: projectId,
@@ -455,6 +545,9 @@ app.post("/analyst/extract", requireAuth, async (req, res) => {
         sessions: {
           orderBy: { createdAt: "desc" },
           take: 1,
+          include: {
+            attachments: true,
+          },
         },
       },
     });
@@ -463,16 +556,21 @@ app.post("/analyst/extract", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "No chat history found" });
     }
 
-    const history = JSON.parse(
-      project.sessions[0].history as string
-    ) as ChatMessage[];
+    const session = project.sessions[0];
+    const history = JSON.parse(session.history as string) as ChatMessage[];
 
-    const transcript = history
-      .filter((m) => m.role !== "system")
-      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-      .join("\n\n");
+    // Create attachment resolver function
+    const resolveAttachment = async (attachmentId: string): Promise<string | null> => {
+      const attachment = await prisma.attachment.findUnique({
+        where: { id: attachmentId },
+      });
+      return attachment ? attachment.storedPath : null;
+    };
 
-    const requirements = await extractor.extractFromTranscript(transcript);
+    const requirements = await extractor.extractFromTranscript(
+      history,
+      resolveAttachment
+    );
     const md = docs.generateRequirementsMarkdown(requirements);
     const mermaid = docs.generateMermaidFlow(requirements);
 
@@ -513,7 +611,7 @@ app.post("/analyst/polish", requireAuth, async (req, res) => {
 });
 
 // Upload Excel file endpoint
-app.post("/analyst/upload-excel", requireAuth, upload.single("file"), async (req, res) => {
+app.post("/analyst/upload-excel", requireAuth, uploadSpreadsheet.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
@@ -599,46 +697,81 @@ app.post("/analyst/upload-excel", requireAuth, upload.single("file"), async (req
 
     result.summary = summaryParts.join("\n");
 
-    // Add the spreadsheet information to the chat history
+    // Get or create chat session for this project
     let chatSession = await prisma.chatSession.findFirst({
       where: { projectId },
       orderBy: { createdAt: "desc" },
     });
 
-    if (chatSession) {
-      const history = JSON.parse(chatSession.history as string) as ChatMessage[];
-      
-      // Create a detailed message about the spreadsheet upload
-      const spreadsheetMessage = `[SYSTEM: User uploaded a spreadsheet file]\n\n${result.summary}`;
-      
-      // Add the spreadsheet info as a user message
-      history.push({
-        role: "user",
-        content: spreadsheetMessage,
-      });
-
-      // Add an acknowledgment from the assistant
-      const acknowledgment = await llm.chat({
-        messages: history,
-        temperature: 0.4,
-      });
-
-      history.push({
-        role: "assistant",
-        content: acknowledgment,
-      });
-
-      // Save the updated history
-      await prisma.chatSession.update({
-        where: { id: chatSession.id },
-        data: { history: JSON.stringify(history) },
+    if (!chatSession) {
+      // Create new session with user's first name
+      const firstName = user.name.split(" ")[0];
+      const history = [{ role: "system", content: SYSTEM_PROMPT_ANALYST(firstName) }];
+      chatSession = await prisma.chatSession.create({
+        data: {
+          projectId,
+          history: JSON.stringify(history),
+        },
       });
     }
 
-    // Clean up the uploaded file after processing
-    fs.unlinkSync(req.file.path);
+    // Create Attachment record
+    const attachment = await prisma.attachment.create({
+      data: {
+        filename: req.file.originalname,
+        storedPath: req.file.path,
+        fileType: "spreadsheet",
+        mimeType: req.file.mimetype,
+        sessionId: chatSession.id,
+      },
+    });
 
-    res.json(result);
+    // Add the spreadsheet information to the chat history
+    const history = JSON.parse(chatSession.history as string) as ChatMessage[];
+    
+    // Create a detailed message about the spreadsheet upload
+    const spreadsheetMessage = `[SYSTEM: User uploaded a spreadsheet file]\n\n${result.summary}`;
+    
+    // Add the spreadsheet info as a user message
+    history.push({
+      role: "user",
+      content: spreadsheetMessage,
+    });
+
+    // Create attachment resolver function
+    const resolveAttachment = async (attachmentId: string): Promise<string | null> => {
+      const attachment = await prisma.attachment.findUnique({
+        where: { id: attachmentId },
+      });
+      return attachment ? attachment.storedPath : null;
+    };
+
+    // Add an acknowledgment from the assistant
+    const acknowledgment = await llm.chat({
+      messages: history,
+      temperature: 0.4,
+      resolveAttachment,
+    });
+
+    history.push({
+      role: "assistant",
+      content: acknowledgment,
+    });
+
+    // Save the updated history
+    await prisma.chatSession.update({
+      where: { id: chatSession.id },
+      data: { history: JSON.stringify(history) },
+    });
+
+    // Keep the file, don't delete it
+    // fs.unlinkSync(req.file.path); // REMOVED
+
+    res.json({
+      ...result,
+      attachmentId: attachment.id,
+      storedPath: attachment.storedPath,
+    });
   } catch (error) {
     console.error("Error processing Excel file:", error);
     
@@ -649,6 +782,178 @@ app.post("/analyst/upload-excel", requireAuth, upload.single("file"), async (req
 
     res.status(500).json({ error: "Failed to process Excel file" });
   }
+});
+
+// Upload image file endpoint
+app.post("/analyst/upload-image", requireAuth, uploadImage.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const { projectId } = req.body;
+
+    if (!projectId) {
+      // Clean up uploaded file on error
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: "projectId is required" });
+    }
+
+    const user = req.user as any;
+
+    // Verify project ownership
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        company: {
+          userId: user.id,
+        },
+      },
+    });
+
+    if (!project) {
+      // Clean up uploaded file on error
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    // Get or create chat session for this project
+    let chatSession = await prisma.chatSession.findFirst({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!chatSession) {
+      // Create new session with user's first name
+      const firstName = user.name.split(" ")[0];
+      const history = [{ role: "system", content: SYSTEM_PROMPT_ANALYST(firstName) }];
+      chatSession = await prisma.chatSession.create({
+        data: {
+          projectId,
+          history: JSON.stringify(history),
+        },
+      });
+    }
+
+    // Create Attachment record
+    const attachment = await prisma.attachment.create({
+      data: {
+        filename: req.file.originalname,
+        storedPath: req.file.path,
+        fileType: "image",
+        mimeType: req.file.mimetype,
+        sessionId: chatSession.id,
+      },
+    });
+
+    // Convert image to base64 data URL for vision analysis
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const base64 = fileBuffer.toString("base64");
+    const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+
+    // Add the image to chat history with vision analysis
+    const history = JSON.parse(chatSession.history as string) as ChatMessage[];
+    
+    // Add the image as a multimodal user message
+    history.push({
+      role: "user",
+      content: [
+        { type: "text", text: "[User uploaded an image/screenshot]" },
+        { type: "image_url", image_url: { url: `attachment://${attachment.id}` } }
+      ],
+    });
+
+    // Get AI analysis using vision (pass dataUrl for immediate analysis)
+    const tempHistory = [
+      ...history.slice(0, -1), // all history except the last message
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "The user has uploaded an image. Please analyze it and describe what you see, then ask relevant questions about how this relates to their software requirements." },
+          { type: "image_url", image_url: { url: dataUrl } }
+        ],
+      }
+    ];
+
+    // Create attachment resolver function
+    const resolveAttachment = async (attachmentId: string): Promise<string | null> => {
+      const attachment = await prisma.attachment.findUnique({
+        where: { id: attachmentId },
+      });
+      return attachment ? attachment.storedPath : null;
+    };
+
+    const analysis = await llm.chat({
+      messages: tempHistory as ChatMessage[],
+      temperature: 0.4,
+      resolveAttachment,
+    });
+
+    history.push({
+      role: "assistant",
+      content: analysis,
+    });
+
+    // Save the updated history
+    await prisma.chatSession.update({
+      where: { id: chatSession.id },
+      data: { history: JSON.stringify(history) },
+    });
+
+    res.json({
+      filename: req.file.originalname,
+      attachmentId: attachment.id,
+      storedPath: attachment.storedPath,
+      analysis,
+    });
+  } catch (error) {
+    console.error("Error processing image file:", error);
+    
+    // Clean up file if it exists and no attachment was created
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({ error: "Failed to process image file" });
+  }
+});
+
+// Global error handler (must be last middleware)
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("=== UNHANDLED ERROR ===");
+  console.error("Path:", req.method, req.path);
+  console.error("Error:", err);
+  console.error("Stack:", err.stack);
+  
+  // Handle multer errors specifically
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ error: "File too large (max 10MB)" });
+    }
+    return res.status(400).json({ error: `Upload error: ${err.message}` });
+  }
+  
+  // Handle custom file filter errors
+  if (err.message && err.message.includes("Only")) {
+    return res.status(400).json({ error: err.message });
+  }
+  
+  res.status(500).json({ error: err.message || "Internal server error" });
+});
+
+// Handle unhandled promise rejections
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("=== UNHANDLED PROMISE REJECTION ===");
+  console.error("Reason:", reason);
+  console.error("Promise:", promise);
+});
+
+// Handle uncaught exceptions
+process.on("uncaughtException", (error) => {
+  console.error("=== UNCAUGHT EXCEPTION ===");
+  console.error("Error:", error);
+  console.error("Stack:", error.stack);
+  // Note: In production, you should gracefully shutdown after this
 });
 
 const PORT = 5051;

@@ -115,7 +115,13 @@ You'll now see an "ADMIN" badge in the header and an "Admin Dashboard" button on
 3. Create a new project or select an existing one
 4. Start chatting with Sunny about your business
 5. Upload Excel spreadsheets (.xls, .xlsx) to share data with Sunny
+   - The system automatically analyzes each sheet (rows, columns, headers, sample data)
+   - This analysis is preserved in the conversation history
 6. When ready, click "Extract Requirements" to generate structured output
+   - All uploaded spreadsheet analysis is automatically included
+   - Requirements document shows a dedicated "Uploaded Documents and Data Sources" section
+   - Each sheet's structure (columns, headers, sample data) is captured
+   - Data entities are extracted for each sheet
 7. Download the requirements.md and workflow.mmd files
 
 **For Admins:**

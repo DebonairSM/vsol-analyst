@@ -250,7 +250,7 @@ async function loadChatHistory(projectId) {
             
             history.forEach(msg => {
                 if (msg.role !== 'system') {
-                    addMessage(msg.role, msg.content);
+                    renderChatMessage(msg.role, msg.content);
                     hasMessages = true;
                 }
             });
@@ -271,6 +271,91 @@ async function loadChatHistory(projectId) {
         const firstName = currentUser.name.split(' ')[0];
         addMessage('assistant', `Hello, ${firstName}! I'm Sunny, your friendly systems analyst for "${currentProject.name}". Tell me about your business, and I'll help you identify your requirements.`);
     }
+}
+
+function renderChatMessage(role, content) {
+    // Handle multimodal content (array with text and images)
+    if (Array.isArray(content)) {
+        let textContent = '';
+        let imageAttachments = [];
+        
+        content.forEach(part => {
+            if (part.type === 'text') {
+                textContent += part.text;
+            } else if (part.type === 'image_url') {
+                // Extract attachment ID from attachment:// URL
+                const url = part.image_url.url;
+                if (url.startsWith('attachment://')) {
+                    const attachmentId = url.replace('attachment://', '');
+                    imageAttachments.push(attachmentId);
+                }
+            }
+        });
+        
+        // Add text message if present
+        if (textContent.trim()) {
+            addMessage(role, textContent);
+        }
+        
+        // Add image messages
+        imageAttachments.forEach(attachmentId => {
+            addHistoricalImageMessage(role, attachmentId);
+        });
+    } else {
+        // Simple text content
+        addMessage(role, content);
+    }
+}
+
+function addHistoricalImageMessage(role, attachmentId) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${role}`;
+    
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'message-header';
+    
+    // Add avatar
+    if (role === 'assistant') {
+        const avatar = document.createElement('img');
+        avatar.src = '/assets/sunny-face.png';
+        avatar.alt = 'Sunny';
+        avatar.className = 'message-avatar';
+        headerDiv.appendChild(avatar);
+    } else if (role === 'user' && currentUser && currentUser.picture && !currentProject?.isAdminView) {
+        const avatar = document.createElement('img');
+        avatar.src = currentUser.picture;
+        avatar.alt = currentUser.name;
+        avatar.className = 'message-avatar';
+        headerDiv.appendChild(avatar);
+    }
+    
+    const label = document.createElement('div');
+    label.className = 'message-label';
+    label.textContent = role === 'user' ? 'You' : 'Sunny';
+    
+    headerDiv.appendChild(label);
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    
+    // Add image preview
+    const attachmentDiv = document.createElement('div');
+    attachmentDiv.className = 'message-attachment';
+    
+    const img = document.createElement('img');
+    img.src = `/api/attachments/${attachmentId}`;
+    img.alt = 'Uploaded image';
+    img.className = 'message-image';
+    img.onclick = () => window.open(`/api/attachments/${attachmentId}`, '_blank');
+    
+    attachmentDiv.appendChild(img);
+    contentDiv.appendChild(attachmentDiv);
+    
+    messageDiv.appendChild(headerDiv);
+    messageDiv.appendChild(contentDiv);
+    chatContainer.appendChild(messageDiv);
+    
+    chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
 function addMessage(role, content) {
@@ -305,6 +390,52 @@ function addMessage(role, content) {
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
     contentDiv.textContent = content;
+    
+    messageDiv.appendChild(headerDiv);
+    messageDiv.appendChild(contentDiv);
+    chatContainer.appendChild(messageDiv);
+    
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function addImageMessage(attachmentId, filename) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message user';
+    
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'message-header';
+    
+    // Add user avatar
+    if (currentUser && currentUser.picture && !currentProject?.isAdminView) {
+        const avatar = document.createElement('img');
+        avatar.src = currentUser.picture;
+        avatar.alt = currentUser.name;
+        avatar.className = 'message-avatar';
+        headerDiv.appendChild(avatar);
+    }
+    
+    const label = document.createElement('div');
+    label.className = 'message-label';
+    label.textContent = 'You';
+    
+    headerDiv.appendChild(label);
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.textContent = filename;
+    
+    // Add image preview
+    const attachmentDiv = document.createElement('div');
+    attachmentDiv.className = 'message-attachment';
+    
+    const img = document.createElement('img');
+    img.src = `/api/attachments/${attachmentId}`;
+    img.alt = filename;
+    img.className = 'message-image';
+    img.onclick = () => window.open(`/api/attachments/${attachmentId}`, '_blank');
+    
+    attachmentDiv.appendChild(img);
+    contentDiv.appendChild(attachmentDiv);
     
     messageDiv.appendChild(headerDiv);
     messageDiv.appendChild(contentDiv);
@@ -675,7 +806,7 @@ async function viewProjectChat(projectId) {
             const history = project.sessions[0].history;
             history.forEach(msg => {
                 if (msg.role !== 'system') {
-                    addMessage(msg.role, msg.content);
+                    renderChatMessage(msg.role, msg.content);
                 }
             });
         } else {
@@ -790,12 +921,21 @@ function rejectPolish() {
 // Excel Upload Functions
 const uploadExcelBtn = document.getElementById('upload-excel-btn');
 const excelFileInput = document.getElementById('excel-file-input');
+const uploadImageBtn = document.getElementById('upload-image-btn');
+const imageFileInput = document.getElementById('image-file-input');
 
 function uploadExcel() {
     if (isProcessing || !currentProject) return;
     
     // Trigger file input
     excelFileInput.click();
+}
+
+function uploadImage() {
+    if (isProcessing || !currentProject) return;
+    
+    // Trigger file input
+    imageFileInput.click();
 }
 
 async function handleExcelUpload(event) {
@@ -827,9 +967,10 @@ async function handleExcelUpload(event) {
     polishBtn.disabled = true;
     extractBtn.disabled = true;
     uploadExcelBtn.disabled = true;
+    uploadImageBtn.disabled = true;
     
     // Show uploading message
-    addMessage('user', `📊 Uploading: ${file.name}`);
+    addMessage('user', `Uploading Excel: ${file.name}`);
     showLoading();
     
     try {
@@ -876,6 +1017,81 @@ async function handleExcelUpload(event) {
     polishBtn.disabled = false;
     extractBtn.disabled = false;
     uploadExcelBtn.disabled = false;
+    uploadImageBtn.disabled = false;
+    messageInput.focus();
+}
+
+async function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+        alert('Please select a valid image file (PNG, JPG, GIF, WebP)');
+        imageFileInput.value = '';
+        return;
+    }
+    
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+        alert('File size must be less than 10MB');
+        imageFileInput.value = '';
+        return;
+    }
+    
+    isProcessing = true;
+    sendBtn.disabled = true;
+    polishBtn.disabled = true;
+    extractBtn.disabled = true;
+    uploadExcelBtn.disabled = true;
+    uploadImageBtn.disabled = true;
+    
+    // Show uploading message
+    addMessage('user', `Uploading image: ${file.name}`);
+    showLoading();
+    
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('projectId', currentProject.id);
+        
+        const response = await fetch('/analyst/upload-image', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Upload failed');
+        }
+        
+        const data = await response.json();
+        
+        // Remove loading message
+        removeLoading();
+        
+        // Add the uploaded image message with the image preview
+        addImageMessage(data.attachmentId, file.name);
+        
+        // Add assistant's analysis
+        addMessage('assistant', data.analysis);
+    } catch (error) {
+        removeLoading();
+        addMessage('assistant', 'Sorry, I had trouble processing that image. Please try again.');
+        console.error('Error uploading image:', error);
+    }
+    
+    // Reset file input
+    imageFileInput.value = '';
+    
+    isProcessing = false;
+    sendBtn.disabled = false;
+    polishBtn.disabled = false;
+    extractBtn.disabled = false;
+    uploadExcelBtn.disabled = false;
+    uploadImageBtn.disabled = false;
     messageInput.focus();
 }
 
@@ -885,6 +1101,8 @@ polishBtn.addEventListener('click', polishText);
 extractBtn.addEventListener('click', extractRequirements);
 uploadExcelBtn.addEventListener('click', uploadExcel);
 excelFileInput.addEventListener('change', handleExcelUpload);
+uploadImageBtn.addEventListener('click', uploadImage);
+imageFileInput.addEventListener('change', handleImageUpload);
 
 messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

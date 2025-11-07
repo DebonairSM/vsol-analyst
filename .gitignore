@@ -5,6 +5,10 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Database files
+prisma/*.db
+prisma/*.db-journal
+
 # Environment variables
 .env
 .env.local
@@ -45,7 +49,14 @@ Desktop.ini
 *.tmp
 .cache/
 
-# Uploaded files
-uploads/
+# Test files
+test-*.xlsx
+test-*.csv
+
+# Uploaded files (keep folder structure)
+uploads/**/*
+!uploads/**/.gitkeep
+!uploads/images/
+!uploads/spreadsheets/
 
 /src/generated/prisma

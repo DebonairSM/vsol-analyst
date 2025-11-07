@@ -32,6 +32,21 @@ export interface RiskOrConstraint {
   type: "technical" | "organizational" | "budget" | "timeline" | "unknown";
 }
 
+export interface UploadedDocumentSheet {
+  name: string;
+  rows: number;
+  columns: number;
+  headers: string[];
+  sampleData: string;
+}
+
+export interface UploadedDocument {
+  filename: string;
+  type: "spreadsheet" | "image" | "document";
+  summary: string;
+  sheets?: UploadedDocumentSheet[];
+}
+
 export interface RequirementsSummary {
   businessContext: BusinessContext;
   primaryGoal: string;
@@ -44,5 +59,6 @@ export interface RequirementsSummary {
   nonFunctionalNeeds: string[];
   risksAndConstraints: RiskOrConstraint[];
   openQuestions: string[];
+  uploadedDocuments: UploadedDocument[];
 }
 

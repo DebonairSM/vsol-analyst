@@ -106,6 +106,19 @@ interface RiskOrConstraint {
   type: "technical" | "organizational" | "budget" | "timeline" | "unknown";
 }
 
+interface UploadedDocument {
+  filename: string;
+  type: "spreadsheet" | "image" | "document";
+  summary: string;
+  sheets?: {
+    name: string;
+    rows: number;
+    columns: number;
+    headers: string[];
+    sampleData: string;
+  }[];
+}
+
 interface RequirementsSummary {
   businessContext: BusinessContext;
   primaryGoal: string;
@@ -118,6 +131,7 @@ interface RequirementsSummary {
   nonFunctionalNeeds: string[];
   risksAndConstraints: RiskOrConstraint[];
   openQuestions: string[];
+  uploadedDocuments: UploadedDocument[];
 }
 
 Rules - CRITICAL FOR THOROUGHNESS:
@@ -130,39 +144,73 @@ Rules - CRITICAL FOR THOROUGHNESS:
    - Every timeline, date, or frequency mentioned
    - Every data field or column name from uploaded files
 
-2. SPREADSHEET DATA - If a spreadsheet was uploaded:
-   - Create a DataEntity for EACH sheet
+2. UPLOADED DOCUMENTS - CRITICAL - If you see "[SYSTEM: User uploaded a spreadsheet file]" or similar in the transcript:
+   - You MUST add an entry to uploadedDocuments array for EACH uploaded file
+   - Extract the filename exactly as shown (e.g., "payroll_payoneer_2020-11-01.xlsx")
+   - Set type to "spreadsheet" for Excel files (.xlsx, .xls), "image" for images, "document" for others
+   - Include the ENTIRE summary text from the system message (everything after "📊 Excel File:")
+   - For spreadsheets, parse the summary and populate the sheets array:
+     * name: exact sheet name from "📄 Sheet:" lines (e.g., "USD", "BRL", "CURRENCY")
+     * rows: number from "Rows:" line
+     * columns: number from "Columns:" line
+     * headers: extract all items from "Column Headers:" section into an array
+     * sampleData: write 1-2 sentences describing the sample data shown
+   
+   Example uploadedDocuments entry:
+   {
+     "filename": "payroll_payoneer_2020-11-01.xlsx",
+     "type": "spreadsheet",
+     "summary": "[paste the entire summary text here]",
+     "sheets": [
+       {
+         "name": "USD",
+         "rows": 6,
+         "columns": 6,
+         "headers": ["25137822", "2206.3", "USD", "1185181-1604322065-1333564", "Oct 1 2020 - Oct 31 2020", "44136"],
+         "sampleData": "Payment records with employee IDs, amounts in USD, transaction IDs, and date ranges"
+       }
+     ]
+   }
+   
+3. SPREADSHEET DATA ENTITIES - If a spreadsheet was uploaded:
+   - ALSO create a DataEntity for EACH sheet (in addition to uploadedDocuments entry)
    - Include EVERY column/field as shown in the upload summary
    - Use the exact field names from the spreadsheet
    - If sample data is shown, infer data types and patterns
 
-3. EXTERNAL RESOURCES:
+4. EXTERNAL RESOURCES:
    - If a website URL is mentioned for branding/colors/design, add it to nonFunctionalNeeds with the full URL
    - If external systems are mentioned (Time Doctor, Payoneer, banks, etc.), list them in currentTools
    - If integration is discussed, create candidateModules for those integrations
 
-4. USERS AND ROLES:
+5. USERS AND ROLES:
    - Identify all types of users mentioned (consultants, admins, clients, etc.)
    - Create mainActors entries for each user type with clear descriptions
 
-5. WORKFLOW DETAILS:
+6. WORKFLOW DETAILS:
    - Capture specific timing (e.g., "5 business days", "end of month")
    - Capture frequencies (daily, weekly, monthly)
    - Capture sequences and dependencies
 
-6. PAIN POINTS - Be specific:
+7. PAIN POINTS - Be specific:
    - Don't generalize - use the customer's exact complaint
    - Assess impact and frequency based on their emphasis
 
-7. VALIDATION:
-   - Before returning, verify you've captured at least:
+8. VALIDATION - BEFORE RETURNING JSON:
+   - Check if you see "[SYSTEM: User uploaded" in the transcript
+   - If YES, you MUST have at least 1 entry in uploadedDocuments array
+   - If you have 0 uploadedDocuments but files were uploaded, GO BACK and extract them
+   - Also verify you've captured at least:
      * 3+ mainActors
      * 1+ dataEntities (if any data was discussed or uploaded)
      * 5+ candidateModules
      * 3+ painPoints
      * currentTools list (if they mentioned any)
 
-8. Do NOT fabricate information, but DO capture everything mentioned or shown.
+9. CRITICAL: If the transcript contains "[SYSTEM: User uploaded" and your uploadedDocuments array is empty, 
+   you have made an ERROR. Fix it before returning.
+
+10. Do NOT fabricate information, but DO capture everything mentioned or shown.
 
 Return ONLY valid JSON, no markdown, no comments.
 `;
