@@ -67,7 +67,14 @@ export class RequirementsExtractor {
       resolveAttachment,
     });
 
-    return JSON.parse(json) as RequirementsSummary;
+    const requirements = JSON.parse(json) as RequirementsSummary;
+    
+    // Ensure uploadedDocuments is always an array
+    if (!requirements.uploadedDocuments) {
+      requirements.uploadedDocuments = [];
+    }
+    
+    return requirements;
   }
 }
 

@@ -34,6 +34,36 @@ export class DocumentGenerator {
       lines.push("");
     }
 
+    // Uploaded Documents - Show this prominently near the top
+    if (req.uploadedDocuments?.length) {
+      lines.push(`## Uploaded Documents and Data Sources`);
+      for (const doc of req.uploadedDocuments) {
+        lines.push(`### ${doc.filename}`);
+        lines.push(`**Type:** ${doc.type}`);
+        lines.push("");
+        
+        if (doc.sheets?.length) {
+          lines.push(`**Sheets:**`);
+          for (const sheet of doc.sheets) {
+            lines.push(`- **${sheet.name}**: ${sheet.rows} rows × ${sheet.columns} columns`);
+            if (sheet.headers?.length) {
+              lines.push(`  - Headers: ${sheet.headers.join(", ")}`);
+            }
+            if (sheet.sampleData) {
+              lines.push(`  - Sample: ${sheet.sampleData}`);
+            }
+          }
+          lines.push("");
+        }
+        
+        if (doc.summary) {
+          lines.push("**Summary:**");
+          lines.push(doc.summary);
+          lines.push("");
+        }
+      }
+    }
+
     // Current Tools
     if (req.currentTools?.length) {
       lines.push(`## Current Tools and Systems`);
