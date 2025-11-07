@@ -26,6 +26,23 @@ const newProjectModal = document.getElementById('new-project-modal');
 const newProjectNameInput = document.getElementById('new-project-name');
 const adminContent = document.getElementById('admin-content');
 
+function configureAvatarElement(avatarEl, size = 36) {
+    if (!avatarEl) return;
+    avatarEl.width = size;
+    avatarEl.height = size;
+    avatarEl.loading = 'eager';
+    avatarEl.decoding = 'async';
+    avatarEl.setAttribute('fetchpriority', 'high');
+    avatarEl.style.width = `${size}px`;
+    avatarEl.style.height = `${size}px`;
+    avatarEl.style.minWidth = `${size}px`;
+    avatarEl.style.minHeight = `${size}px`;
+    avatarEl.style.maxWidth = `${size}px`;
+    avatarEl.style.maxHeight = `${size}px`;
+    avatarEl.style.display = 'block';
+    avatarEl.style.objectFit = 'contain';
+}
+
 // Initialize app
 async function init() {
     try {
@@ -320,12 +337,14 @@ function addHistoricalImageMessage(role, attachmentId) {
         avatar.src = '/assets/sunny-face.png';
         avatar.alt = 'Sunny';
         avatar.className = 'message-avatar';
+        configureAvatarElement(avatar);
         headerDiv.appendChild(avatar);
     } else if (role === 'user' && currentUser && currentUser.picture && !currentProject?.isAdminView) {
         const avatar = document.createElement('img');
         avatar.src = currentUser.picture;
         avatar.alt = currentUser.name;
         avatar.className = 'message-avatar';
+        configureAvatarElement(avatar);
         headerDiv.appendChild(avatar);
     }
     
@@ -371,6 +390,7 @@ function addMessage(role, content) {
         avatar.src = '/assets/sunny-face.png';
         avatar.alt = 'Sunny';
         avatar.className = 'message-avatar';
+        configureAvatarElement(avatar);
         headerDiv.appendChild(avatar);
     } else if (role === 'user' && currentUser && currentUser.picture && !currentProject?.isAdminView) {
         // Only show user avatar if not in admin view
@@ -378,6 +398,7 @@ function addMessage(role, content) {
         avatar.src = currentUser.picture;
         avatar.alt = currentUser.name;
         avatar.className = 'message-avatar';
+        configureAvatarElement(avatar);
         headerDiv.appendChild(avatar);
     }
     
@@ -411,6 +432,7 @@ function addImageMessage(attachmentId, filename) {
         avatar.src = currentUser.picture;
         avatar.alt = currentUser.name;
         avatar.className = 'message-avatar';
+        configureAvatarElement(avatar);
         headerDiv.appendChild(avatar);
     }
     
