@@ -235,6 +235,8 @@
             width: 400px;
             border: 3px solid #FFD93D;
             will-change: auto;
+            transform: translateZ(0);
+            contain: layout;
         }
 
         .login-logo {
@@ -248,6 +250,8 @@
             display: block;
             object-fit: contain;
             aspect-ratio: 1 / 1;
+            will-change: transform;
+            transform: translateZ(0);
         }
 
         .login-card h2 {
@@ -567,15 +571,15 @@
         }
 
         #send-btn {
-            background: #2563eb;
+            background: #16a34a;
             color: white;
-            box-shadow: 0 3px 10px rgba(37,99,235,0.3);
+            box-shadow: 0 3px 10px rgba(22,163,74,0.3);
         }
 
         #send-btn:hover {
-            background: #1d4ed8;
+            background: #15803d;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(37,99,235,0.4);
+            box-shadow: 0 5px 15px rgba(22,163,74,0.4);
         }
 
         #send-btn:disabled {
@@ -587,15 +591,15 @@
 
         #polish-btn {
             background: white;
-            color: #8b5cf6;
-            border: 2px solid #8b5cf6;
-            box-shadow: 0 2px 6px rgba(139,92,246,0.15);
+            color: #1e40af;
+            border: 2px solid #1e40af;
+            box-shadow: 0 2px 6px rgba(30,64,175,0.15);
         }
 
         #polish-btn:hover {
-            background: #f5f3ff;
+            background: #eff6ff;
             transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(139,92,246,0.25);
+            box-shadow: 0 4px 10px rgba(30,64,175,0.25);
         }
 
         #polish-btn:disabled {
@@ -608,15 +612,15 @@
         }
 
         #extract-btn {
-            background: #16a34a;
+            background: #1e40af;
             color: white;
-            box-shadow: 0 3px 10px rgba(22,163,74,0.3);
+            box-shadow: 0 3px 10px rgba(30,64,175,0.3);
         }
 
         #extract-btn:hover {
-            background: #15803d;
+            background: #1e3a8a;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(22,163,74,0.4);
+            box-shadow: 0 5px 15px rgba(30,64,175,0.4);
         }
 
         #extract-btn:disabled {
@@ -627,15 +631,15 @@
         }
 
         #upload-excel-btn {
-            background: #0ea5e9;
+            background: #2563eb;
             color: white;
-            box-shadow: 0 3px 10px rgba(14,165,233,0.3);
+            box-shadow: 0 3px 10px rgba(37,99,235,0.3);
         }
 
         #upload-excel-btn:hover {
-            background: #0284c7;
+            background: #1d4ed8;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(14,165,233,0.4);
+            box-shadow: 0 5px 15px rgba(37,99,235,0.4);
         }
 
         #upload-excel-btn:disabled {
@@ -646,15 +650,15 @@
         }
 
         #upload-image-btn {
-            background: #ec4899;
+            background: #3b82f6;
             color: white;
-            box-shadow: 0 3px 10px rgba(236,72,153,0.3);
+            box-shadow: 0 3px 10px rgba(59,130,246,0.3);
         }
 
         #upload-image-btn:hover {
-            background: #db2777;
+            background: #2563eb;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(236,72,153,0.4);
+            box-shadow: 0 5px 15px rgba(59,130,246,0.4);
         }
 
         #upload-image-btn:disabled {
@@ -665,15 +669,15 @@
         }
 
         #voice-btn {
-            background: #f59e0b;
+            background: #60a5fa;
             color: white;
-            box-shadow: 0 3px 10px rgba(245,158,11,0.3);
+            box-shadow: 0 3px 10px rgba(96,165,250,0.3);
         }
 
         #voice-btn:hover {
-            background: #d97706;
+            background: #3b82f6;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(245,158,11,0.4);
+            box-shadow: 0 5px 15px rgba(96,165,250,0.4);
         }
 
         #voice-btn:disabled {
@@ -754,30 +758,30 @@
         }
 
         .download-btn {
-            background: #8b5cf6;
+            background: #1e40af;
             color: white;
             margin-top: 0.5rem;
-            box-shadow: 0 3px 10px rgba(139,92,246,0.3);
+            box-shadow: 0 3px 10px rgba(30,64,175,0.3);
         }
 
         .download-btn:hover {
-            background: #7c3aed;
+            background: #1e3a8a;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(139,92,246,0.4);
+            box-shadow: 0 5px 15px rgba(30,64,175,0.4);
         }
 
         .copy-btn {
-            background: #0ea5e9;
+            background: #3b82f6;
             color: white;
             margin-top: 0.5rem;
             margin-left: 0.5rem;
-            box-shadow: 0 3px 10px rgba(14,165,233,0.3);
+            box-shadow: 0 3px 10px rgba(59,130,246,0.3);
         }
 
         .copy-btn:hover {
-            background: #0284c7;
+            background: #2563eb;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(14,165,233,0.4);
+            box-shadow: 0 5px 15px rgba(59,130,246,0.4);
         }
 
         .copy-btn.copied {
@@ -1641,7 +1645,7 @@
                 <div class="button-row">
                     <div class="button-row-left">
                         <button id="extract-btn">Extract Requirements</button>
-                        <button id="upload-excel-btn" style="background: #0ea5e9;">
+                        <button id="upload-excel-btn">
                             <span class="material-symbols-outlined">table_chart</span>Upload Excel
                         </button>
                         <input 
@@ -1650,7 +1654,7 @@
                             accept=".xls,.xlsx" 
                             style="display: none;"
                         />
-                        <button id="upload-image-btn" style="background: #ec4899;">
+                        <button id="upload-image-btn">
                             <span class="material-symbols-outlined">image</span>Upload Image
                         </button>
                         <input 
@@ -1715,7 +1719,7 @@
     <div id="output-modal" class="modal">
         <div class="modal-content output-modal-content">
             <div id="extraction-loading" style="display: none; text-align: center; padding: 2rem;">
-                <img src="/assets/sunny-face.png" alt="Sunny" class="extraction-loading-avatar" width="120" height="120" loading="eager" style="width:120px;height:120px;min-width:120px;min-height:120px;max-width:120px;max-height:120px;display:block;object-fit:contain;aspect-ratio:1/1;">
+                <img src="/assets/sunny-face.png" alt="Sunny" class="extraction-loading-avatar" width="120" height="120" loading="eager" style="width:120px;height:120px;min-width:120px;min-height:120px;max-width:120px;max-height:120px;display:block;object-fit:contain;aspect-ratio:1/1;margin:0 auto;">
                 <h3 style="margin-top: 1.5rem; color: #111827;">Sunny is analyzing your conversation...</h3>
                 <p style="color: #6b7280; margin-top: 0.5rem;">Extracting requirements and generating documentation</p>
                 <div class="loading-dots">
@@ -1741,6 +1745,30 @@
                     <button class="copy-btn" onclick="copyMermaid(event)">Copy to Clipboard</button>
                     <button class="download-btn" onclick="downloadMermaid()">Download workflow.mmd</button>
                 </div>
+                <div class="output-section" style="margin-top: 1.5rem;">
+                    <h4 style="margin-bottom: 0.5rem; color: #111827; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="material-symbols-outlined">auto_stories</span>
+                        User Stories
+                    </h4>
+                    <button id="generate-stories-btn" class="generate-stories-btn" onclick="generateUserStories()" style="background: #1e40af; color: white; box-shadow: 0 3px 10px rgba(30,64,175,0.3); padding: 0.875rem 1.5rem; border: none; border-radius: 10px; font-weight: 600; transition: all 0.3s; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 1rem; margin-bottom: 1rem;">
+                        <span class="material-symbols-outlined">auto_stories</span>
+                        Generate User Stories
+                    </button>
+                    <div id="stories-loading" style="display: none; text-align: center; padding: 2rem;">
+                        <img src="/assets/sunny-face.png" alt="Sunny" class="extraction-loading-avatar" width="80" height="80" style="width:80px;height:80px;margin:0 auto;">
+                        <p style="color: #6b7280; margin-top: 1rem; font-size: 0.95rem;">Generating user stories...</p>
+                        <div class="loading-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                    <div id="stories-output" style="display: none;">
+                        <textarea id="user-stories-output" readonly style="width: 100%; min-height: 300px; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-family: monospace; font-size: 0.9rem; margin-bottom: 0.5rem;"></textarea>
+                        <button class="copy-btn" onclick="copyUserStories(event)">Copy to Clipboard</button>
+                        <button class="download-btn" onclick="downloadUserStories()">Download user-stories.md</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1748,7 +1776,7 @@
     <div id="polish-modal" class="modal">
         <div class="modal-content polish-modal-content">
             <div id="polish-loading" style="display: none; text-align: center; padding: 2rem;">
-                <img src="/assets/sunny-face.png" alt="Sunny" class="extraction-loading-avatar" width="120" height="120" loading="eager" style="width:120px;height:120px;min-width:120px;min-height:120px;max-width:120px;max-height:120px;display:block;object-fit:contain;aspect-ratio:1/1;">
+                <img src="/assets/sunny-face.png" alt="Sunny" class="extraction-loading-avatar" width="120" height="120" loading="eager" style="width:120px;height:120px;min-width:120px;min-height:120px;max-width:120px;max-height:120px;display:block;object-fit:contain;aspect-ratio:1/1;margin:0 auto;">
                 <h3 style="margin-top: 1.5rem; color: #111827;">Polishing your text...</h3>
                 <p style="color: #6b7280; margin-top: 0.5rem;">Improving clarity and structure</p>
                 <div class="loading-dots">

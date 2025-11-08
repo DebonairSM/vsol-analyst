@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Stories Feature - Mockup</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            font-size: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        }
+
+        .header {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 3px solid #FFD93D;
+        }
+
+        .header h1 {
+            color: #111827;
+            margin-bottom: 0.5rem;
+            font-size: 1.75rem;
+        }
+
+        .header p {
+            color: #6b7280;
+            font-size: 0.95rem;
+        }
+
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%);
+            border-radius: 8px;
+            border-left: 4px solid #10b981;
+        }
+
+        .section-title h4 {
+            color: #111827;
+            font-size: 1rem;
+            margin: 0;
+        }
+
+        .generate-stories-btn {
+            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+            color: white;
+            box-shadow: 0 3px 10px rgba(139,92,246,0.3);
+            padding: 1rem 1.75rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .generate-stories-btn:hover {
+            background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(139,92,246,0.4);
+        }
+
+        .generate-stories-btn .material-symbols-outlined {
+            font-size: 24px;
+        }
+
+        /* View Toggle */
+        .view-toggle {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            background: #f3f4f6;
+            padding: 0.25rem;
+            border-radius: 8px;
+            width: fit-content;
+        }
+
+        .view-toggle-btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: transparent;
+            color: #6b7280;
+            font-weight: 600;
+            font-size: 0.875rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .view-toggle-btn.active {
+            background: white;
+            color: #8b5cf6;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .view-toggle-btn:hover:not(.active) {
+            color: #374151;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e40af;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            margin-top: 0.25rem;
+        }
+
+        /* User Story Card */
+        .story-group {
+            margin-bottom: 2rem;
+        }
+
+        .group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .group-header:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(30,58,138,0.3);
+        }
+
+        .group-header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .group-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .group-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .group-count {
+            background: rgba(255,255,255,0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .story-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .story-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(180deg, #8b5cf6 0%, #a855f7 100%);
+        }
+
+        .story-card:hover {
+            border-color: #8b5cf6;
+            box-shadow: 0 4px 12px rgba(139,92,246,0.15);
+            transform: translateY(-2px);
+        }
+
+        .story-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .story-id {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #8b5cf6;
+            background: #f5f3ff;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .story-badges {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .story-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 1rem;
+            line-height: 1.4;
+        }
+
+        .story-body {
+            margin-bottom: 1rem;
+        }
+
+        .story-line {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            color: #374151;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .story-line strong {
+            font-weight: 700;
+            color: #1e40af;
+            min-width: 100px;
+        }
+
+        .acceptance-criteria {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .acceptance-criteria h5 {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .criteria-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .criteria-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: #4b5563;
+        }
+
+        .criteria-checkbox {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #9ca3af;
+            border-radius: 4px;
+            flex-shrink: 0;
+            margin-top: 0.15rem;
+        }
+
+        .story-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .story-meta {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .meta-label {
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .priority-must {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .priority-should {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .priority-nice {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .effort-small {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .effort-medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .effort-large {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .actor-badge {
+            background: #f3e8ff;
+            color: #6b21a8;
+        }
+
+        /* Matrix View */
+        .matrix-container {
+            display: none;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .matrix-container.active {
+            display: grid;
+        }
+
+        .matrix-quadrant {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 300px;
+        }
+
+        .matrix-quadrant h4 {
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .quadrant-quick-wins {
+            border-color: #10b981;
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        }
+
+        .quadrant-quick-wins h4 {
+            color: #065f46;
+        }
+
+        .quadrant-major {
+            border-color: #8b5cf6;
+            background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+        }
+
+        .quadrant-major h4 {
+            color: #6b21a8;
+        }
+
+        .quadrant-fill {
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        }
+
+        .quadrant-fill h4 {
+            color: #1e40af;
+        }
+
+        .quadrant-low {
+            border-color: #9ca3af;
+            background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+        }
+
+        .quadrant-low h4 {
+            color: #4b5563;
+        }
+
+        .matrix-story-mini {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .matrix-story-mini:hover {
+            border-color: #8b5cf6;
+            box-shadow: 0 2px 8px rgba(139,92,246,0.15);
+        }
+
+        .matrix-story-mini .story-id {
+            font-size: 0.7rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .matrix-story-mini .story-title {
+            font-size: 0.875rem;
+            margin-bottom: 0;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 2px solid #e5e7eb;
+        }
+
+        .copy-btn, .download-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .copy-btn {
+            background: #0ea5e9;
+            color: white;
+            box-shadow: 0 3px 10px rgba(14,165,233,0.3);
+        }
+
+        .copy-btn:hover {
+            background: #0284c7;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(14,165,233,0.4);
+        }
+
+        .download-btn {
+            background: #8b5cf6;
+            color: white;
+            box-shadow: 0 3px 10px rgba(139,92,246,0.3);
+        }
+
+        .download-btn:hover {
+            background: #7c3aed;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(139,92,246,0.4);
+        }
+
+        /* List View */
+        .list-view {
+            display: block;
+        }
+
+        .list-view.hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+
+            .container {
+                padding: 1.5rem;
+            }
+
+            .matrix-container {
+                grid-template-columns: 1fr;
+            }
+
+            .story-footer {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Requirements Extracted</h1>
+            <p>Complete requirements documentation generated from your conversation with Sunny</p>
+        </div>
+
+        <!-- Requirements Document Section (already exists) -->
+        <div class="section">
+            <div class="section-title">
+                <span class="material-symbols-outlined">description</span>
+                <h4>Requirements Document</h4>
+            </div>
+            <textarea readonly style="width: 100%; min-height: 150px; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-family: monospace; font-size: 0.9rem; margin-bottom: 0.5rem; resize: vertical;"># System Requirements
+
+## Business Context
+Company: ABC Barber Shop
+Industry: Personal Services
+Region: Downtown Seattle
+Size: 3 barbers, 200+ clients
+
+## Primary Goal
+Replace Excel-based appointment system with custom booking software
+
+## Candidate Modules
+- **Online Booking Portal** (must-have) - Customer self-service scheduling
+- **Barber Dashboard** (must-have) - View daily schedule and client history
+- **SMS Notifications** (should-have) - Automated appointment reminders
+...</textarea>
+            <button class="copy-btn">
+                <span class="material-symbols-outlined">content_copy</span>
+                Copy to Clipboard
+            </button>
+            <button class="download-btn">
+                <span class="material-symbols-outlined">download</span>
+                Download requirements.md
+            </button>
+        </div>
+
+        <!-- Workflow Diagram Section (already exists) -->
+        <div class="section">
+            <div class="section-title">
+                <span class="material-symbols-outlined">account_tree</span>
+                <h4>Workflow Diagram (Mermaid)</h4>
+            </div>
+            <textarea readonly style="width: 100%; min-height: 100px; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-family: monospace; font-size: 0.9rem; margin-bottom: 0.5rem; resize: vertical;">flowchart TD
+    A[Customer] --> B[Book Appointment Online]
+    B --> C[Select Barber & Time]
+    C --> D[Receive Confirmation]
+    D --> E[Get SMS Reminder]
+    E --> F[Attend Appointment]
+...</textarea>
+            <button class="copy-btn">
+                <span class="material-symbols-outlined">content_copy</span>
+                Copy to Clipboard
+            </button>
+            <button class="download-btn">
+                <span class="material-symbols-outlined">download</span>
+                Download workflow.mmd
+            </button>
+        </div>
+
+        <!-- NEW: User Stories Section -->
+        <div class="section">
+            <div class="section-title">
+                <span class="material-symbols-outlined">auto_stories</span>
+                <h4>User Stories</h4>
+            </div>
+            
+            <button class="generate-stories-btn" onclick="showGeneratedStories()">
+                <span class="material-symbols-outlined">auto_stories</span>
+                Generate User Stories
+            </button>
+
+            <!-- After Generation -->
+            <div id="generated-stories" style="display: none;">
+                <!-- Stats Bar -->
+                <div class="stats-bar">
+                    <div class="stat-card">
+                        <span class="stat-value">12</span>
+                        <span class="stat-label">Total Stories</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">5</span>
+                        <span class="stat-label">Must-Have</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">4</span>
+                        <span class="stat-label">Should-Have</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">3</span>
+                        <span class="stat-label">Nice-to-Have</span>
+                    </div>
+                </div>
+
+                <!-- View Toggle -->
+                <div class="view-toggle">
+                    <button class="view-toggle-btn active" onclick="switchView('epic')">
+                        <span class="material-symbols-outlined">layers</span>
+                        By Epic
+                    </button>
+                    <button class="view-toggle-btn" onclick="switchView('matrix')">
+                        <span class="material-symbols-outlined">grid_view</span>
+                        Impact Matrix
+                    </button>
+                    <button class="view-toggle-btn" onclick="switchView('actor')">
+                        <span class="material-symbols-outlined">groups</span>
+                        By Actor
+                    </button>
+                </div>
+
+                <!-- Epic View (Default) -->
+                <div id="epic-view" class="list-view">
+                    <!-- Epic 1: Online Booking Portal -->
+                    <div class="story-group">
+                        <div class="group-header">
+                            <div class="group-header-left">
+                                <div class="group-icon">
+                                    <span class="material-symbols-outlined">calendar_month</span>
+                                </div>
+                                <span class="group-title">Epic 1: Online Booking Portal</span>
+                            </div>
+                            <span class="group-count">4 stories</span>
+                        </div>
+
+                        <!-- Story 1.1 -->
+                        <div class="story-card">
+                            <div class="story-header">
+                                <span class="story-id">US-001</span>
+                                <div class="story-badges">
+                                    <span class="badge priority-must">Must-Have</span>
+                                    <span class="badge effort-medium">Medium</span>
+                                    <span class="badge actor-badge">Customer</span>
+                                </div>
+                            </div>
+                            <h3 class="story-title">View Available Appointment Slots</h3>
+                            <div class="story-body">
+                                <div class="story-line">
+                                    <strong>As a</strong>
+                                    <span>customer</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>I want to</strong>
+                                    <span>view all available appointment times for my preferred barber</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>So that</strong>
+                                    <span>I can choose a convenient time without calling the shop</span>
+                                </div>
+                            </div>
+                            <div class="acceptance-criteria">
+                                <h5>
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">checklist</span>
+                                    Acceptance Criteria
+                                </h5>
+                                <ul class="criteria-list">
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Calendar shows next 30 days of availability</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Can filter by specific barber or see "any available"</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Time slots show in 30-minute increments</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Unavailable slots are clearly marked and non-clickable</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="story-footer">
+                                <div class="story-meta">
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">schedule</span>
+                                        <span class="meta-label">Sprint 1</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">flag</span>
+                                        <span class="meta-label">5 Story Points</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Story 1.2 -->
+                        <div class="story-card">
+                            <div class="story-header">
+                                <span class="story-id">US-002</span>
+                                <div class="story-badges">
+                                    <span class="badge priority-must">Must-Have</span>
+                                    <span class="badge effort-medium">Medium</span>
+                                    <span class="badge actor-badge">Customer</span>
+                                </div>
+                            </div>
+                            <h3 class="story-title">Book Appointment with Contact Details</h3>
+                            <div class="story-body">
+                                <div class="story-line">
+                                    <strong>As a</strong>
+                                    <span>customer</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>I want to</strong>
+                                    <span>book an appointment by providing my name and phone number</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>So that</strong>
+                                    <span>the shop has my contact info and can confirm my booking</span>
+                                </div>
+                            </div>
+                            <div class="acceptance-criteria">
+                                <h5>
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">checklist</span>
+                                    Acceptance Criteria
+                                </h5>
+                                <ul class="criteria-list">
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Form requires name (first and last) and valid phone number</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Phone number validation accepts standard US formats</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Optional field for special requests or notes</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Confirmation screen shows booking summary before submission</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="story-footer">
+                                <div class="story-meta">
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">schedule</span>
+                                        <span class="meta-label">Sprint 1</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">flag</span>
+                                        <span class="meta-label">3 Story Points</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Story 1.3 -->
+                        <div class="story-card">
+                            <div class="story-header">
+                                <span class="story-id">US-003</span>
+                                <div class="story-badges">
+                                    <span class="badge priority-should">Should-Have</span>
+                                    <span class="badge effort-small">Small</span>
+                                    <span class="badge actor-badge">Customer</span>
+                                </div>
+                            </div>
+                            <h3 class="story-title">Receive Booking Confirmation</h3>
+                            <div class="story-body">
+                                <div class="story-line">
+                                    <strong>As a</strong>
+                                    <span>customer</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>I want to</strong>
+                                    <span>receive immediate confirmation after booking an appointment</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>So that</strong>
+                                    <span>I know my appointment is scheduled and have the details saved</span>
+                                </div>
+                            </div>
+                            <div class="acceptance-criteria">
+                                <h5>
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">checklist</span>
+                                    Acceptance Criteria
+                                </h5>
+                                <ul class="criteria-list">
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>On-screen confirmation shows immediately after booking</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Confirmation includes barber name, date, time, and location</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Option to add appointment to personal calendar (iCal/Google)</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="story-footer">
+                                <div class="story-meta">
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">schedule</span>
+                                        <span class="meta-label">Sprint 2</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">flag</span>
+                                        <span class="meta-label">2 Story Points</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Story 1.4 -->
+                        <div class="story-card">
+                            <div class="story-header">
+                                <span class="story-id">US-004</span>
+                                <div class="story-badges">
+                                    <span class="badge priority-nice">Nice-to-Have</span>
+                                    <span class="badge effort-small">Small</span>
+                                    <span class="badge actor-badge">Customer</span>
+                                </div>
+                            </div>
+                            <h3 class="story-title">Cancel or Reschedule Appointment</h3>
+                            <div class="story-body">
+                                <div class="story-line">
+                                    <strong>As a</strong>
+                                    <span>customer</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>I want to</strong>
+                                    <span>cancel or reschedule my appointment online</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>So that</strong>
+                                    <span>I can manage my schedule without calling the shop</span>
+                                </div>
+                            </div>
+                            <div class="acceptance-criteria">
+                                <h5>
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">checklist</span>
+                                    Acceptance Criteria
+                                </h5>
+                                <ul class="criteria-list">
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Customer can access booking via confirmation link or phone lookup</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Cancellation allowed up to 2 hours before appointment</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Reschedule option shows available alternative time slots</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="story-footer">
+                                <div class="story-meta">
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">schedule</span>
+                                        <span class="meta-label">Sprint 3</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">flag</span>
+                                        <span class="meta-label">3 Story Points</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Epic 2: Barber Dashboard -->
+                    <div class="story-group">
+                        <div class="group-header">
+                            <div class="group-header-left">
+                                <div class="group-icon">
+                                    <span class="material-symbols-outlined">dashboard</span>
+                                </div>
+                                <span class="group-title">Epic 2: Barber Dashboard</span>
+                            </div>
+                            <span class="group-count">3 stories</span>
+                        </div>
+
+                        <!-- Story 2.1 -->
+                        <div class="story-card">
+                            <div class="story-header">
+                                <span class="story-id">US-005</span>
+                                <div class="story-badges">
+                                    <span class="badge priority-must">Must-Have</span>
+                                    <span class="badge effort-medium">Medium</span>
+                                    <span class="badge actor-badge">Barber</span>
+                                </div>
+                            </div>
+                            <h3 class="story-title">View Daily Schedule</h3>
+                            <div class="story-body">
+                                <div class="story-line">
+                                    <strong>As a</strong>
+                                    <span>barber</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>I want to</strong>
+                                    <span>see my daily appointment schedule in an easy-to-read format</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>So that</strong>
+                                    <span>I know when clients are coming and can prepare accordingly</span>
+                                </div>
+                            </div>
+                            <div class="acceptance-criteria">
+                                <h5>
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">checklist</span>
+                                    Acceptance Criteria
+                                </h5>
+                                <ul class="criteria-list">
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Dashboard shows today's appointments by default</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Each appointment shows customer name, time, and phone number</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Can navigate to view future days or past appointments</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Current appointment is highlighted or marked as "in progress"</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="story-footer">
+                                <div class="story-meta">
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">schedule</span>
+                                        <span class="meta-label">Sprint 1</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">flag</span>
+                                        <span class="meta-label">5 Story Points</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Story 2.2 -->
+                        <div class="story-card">
+                            <div class="story-header">
+                                <span class="story-id">US-006</span>
+                                <div class="story-badges">
+                                    <span class="badge priority-should">Should-Have</span>
+                                    <span class="badge effort-small">Small</span>
+                                    <span class="badge actor-badge">Barber</span>
+                                </div>
+                            </div>
+                            <h3 class="story-title">View Client History</h3>
+                            <div class="story-body">
+                                <div class="story-line">
+                                    <strong>As a</strong>
+                                    <span>barber</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>I want to</strong>
+                                    <span>access a client's previous appointment history</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>So that</strong>
+                                    <span>I can provide personalized service and remember their preferences</span>
+                                </div>
+                            </div>
+                            <div class="acceptance-criteria">
+                                <h5>
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">checklist</span>
+                                    Acceptance Criteria
+                                </h5>
+                                <ul class="criteria-list">
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Click on appointment to see full client profile</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Shows list of past appointments with dates</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Can add notes about client preferences or special requests</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="story-footer">
+                                <div class="story-meta">
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">schedule</span>
+                                        <span class="meta-label">Sprint 2</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">flag</span>
+                                        <span class="meta-label">3 Story Points</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Story 2.3 -->
+                        <div class="story-card">
+                            <div class="story-header">
+                                <span class="story-id">US-007</span>
+                                <div class="story-badges">
+                                    <span class="badge priority-must">Must-Have</span>
+                                    <span class="badge effort-small">Small</span>
+                                    <span class="badge actor-badge">Barber</span>
+                                </div>
+                            </div>
+                            <h3 class="story-title">Block Off Personal Time</h3>
+                            <div class="story-body">
+                                <div class="story-line">
+                                    <strong>As a</strong>
+                                    <span>barber</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>I want to</strong>
+                                    <span>block off time slots for breaks, lunch, or personal appointments</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>So that</strong>
+                                    <span>customers cannot book during times I'm unavailable</span>
+                                </div>
+                            </div>
+                            <div class="acceptance-criteria">
+                                <h5>
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">checklist</span>
+                                    Acceptance Criteria
+                                </h5>
+                                <ul class="criteria-list">
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Can select time range to block on calendar view</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Blocked times show as unavailable in booking portal</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Can add optional label for blocked time (e.g., "Lunch")</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Can remove or modify blocked time slots</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="story-footer">
+                                <div class="story-meta">
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">schedule</span>
+                                        <span class="meta-label">Sprint 1</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">flag</span>
+                                        <span class="meta-label">3 Story Points</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Epic 3: SMS Notifications -->
+                    <div class="story-group">
+                        <div class="group-header">
+                            <div class="group-header-left">
+                                <div class="group-icon">
+                                    <span class="material-symbols-outlined">sms</span>
+                                </div>
+                                <span class="group-title">Epic 3: SMS Notifications</span>
+                            </div>
+                            <span class="group-count">2 stories</span>
+                        </div>
+
+                        <!-- Story 3.1 -->
+                        <div class="story-card">
+                            <div class="story-header">
+                                <span class="story-id">US-008</span>
+                                <div class="story-badges">
+                                    <span class="badge priority-should">Should-Have</span>
+                                    <span class="badge effort-medium">Medium</span>
+                                    <span class="badge actor-badge">Customer</span>
+                                </div>
+                            </div>
+                            <h3 class="story-title">Receive Appointment Reminder</h3>
+                            <div class="story-body">
+                                <div class="story-line">
+                                    <strong>As a</strong>
+                                    <span>customer</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>I want to</strong>
+                                    <span>receive an SMS reminder 24 hours before my appointment</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>So that</strong>
+                                    <span>I don't forget about my scheduled haircut</span>
+                                </div>
+                            </div>
+                            <div class="acceptance-criteria">
+                                <h5>
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">checklist</span>
+                                    Acceptance Criteria
+                                </h5>
+                                <ul class="criteria-list">
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>SMS sent automatically 24 hours before appointment time</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Message includes barber name, date, time, and shop address</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Includes link to cancel or reschedule if needed</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="story-footer">
+                                <div class="story-meta">
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">schedule</span>
+                                        <span class="meta-label">Sprint 2</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">flag</span>
+                                        <span class="meta-label">5 Story Points</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Story 3.2 -->
+                        <div class="story-card">
+                            <div class="story-header">
+                                <span class="story-id">US-009</span>
+                                <div class="story-badges">
+                                    <span class="badge priority-nice">Nice-to-Have</span>
+                                    <span class="badge effort-small">Small</span>
+                                    <span class="badge actor-badge">Barber</span>
+                                </div>
+                            </div>
+                            <h3 class="story-title">Get No-Show Notification</h3>
+                            <div class="story-body">
+                                <div class="story-line">
+                                    <strong>As a</strong>
+                                    <span>barber</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>I want to</strong>
+                                    <span>mark appointments as "no-show" in the system</span>
+                                </div>
+                                <div class="story-line">
+                                    <strong>So that</strong>
+                                    <span>I can track which clients frequently miss appointments</span>
+                                </div>
+                            </div>
+                            <div class="acceptance-criteria">
+                                <h5>
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">checklist</span>
+                                    Acceptance Criteria
+                                </h5>
+                                <ul class="criteria-list">
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>"Mark as No-Show" button appears for past appointments</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Client profile shows no-show history count</span>
+                                    </li>
+                                    <li class="criteria-item">
+                                        <div class="criteria-checkbox"></div>
+                                        <span>Optional: Require deposit for clients with 2+ no-shows</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="story-footer">
+                                <div class="story-meta">
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">schedule</span>
+                                        <span class="meta-label">Sprint 3</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="material-symbols-outlined" style="font-size: 18px; color: #6b7280;">flag</span>
+                                        <span class="meta-label">2 Story Points</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Impact Matrix View -->
+                <div id="matrix-view" class="matrix-container">
+                    <div class="matrix-quadrant quadrant-quick-wins">
+                        <h4>
+                            <span class="material-symbols-outlined">bolt</span>
+                            Quick Wins (High Impact, Low Effort)
+                        </h4>
+                        <div class="matrix-story-mini">
+                            <span class="story-id">US-003</span>
+                            <div class="story-title">Receive Booking Confirmation</div>
+                        </div>
+                        <div class="matrix-story-mini">
+                            <span class="story-id">US-004</span>
+                            <div class="story-title">Cancel or Reschedule Appointment</div>
+                        </div>
+                        <div class="matrix-story-mini">
+                            <span class="story-id">US-007</span>
+                            <div class="story-title">Block Off Personal Time</div>
+                        </div>
+                    </div>
+
+                    <div class="matrix-quadrant quadrant-major">
+                        <h4>
+                            <span class="material-symbols-outlined">rocket_launch</span>
+                            Major Projects (High Impact, High Effort)
+                        </h4>
+                        <div class="matrix-story-mini">
+                            <span class="story-id">US-001</span>
+                            <div class="story-title">View Available Appointment Slots</div>
+                        </div>
+                        <div class="matrix-story-mini">
+                            <span class="story-id">US-002</span>
+                            <div class="story-title">Book Appointment with Contact Details</div>
+                        </div>
+                        <div class="matrix-story-mini">
+                            <span class="story-id">US-005</span>
+                            <div class="story-title">View Daily Schedule</div>
+                        </div>
+                        <div class="matrix-story-mini">
+                            <span class="story-id">US-008</span>
+                            <div class="story-title">Receive Appointment Reminder</div>
+                        </div>
+                    </div>
+
+                    <div class="matrix-quadrant quadrant-fill">
+                        <h4>
+                            <span class="material-symbols-outlined">savings</span>
+                            Fill-Ins (Lower Impact, Low Effort)
+                        </h4>
+                        <div class="matrix-story-mini">
+                            <span class="story-id">US-006</span>
+                            <div class="story-title">View Client History</div>
+                        </div>
+                        <div class="matrix-story-mini">
+                            <span class="story-id">US-009</span>
+                            <div class="story-title">Get No-Show Notification</div>
+                        </div>
+                    </div>
+
+                    <div class="matrix-quadrant quadrant-low">
+                        <h4>
+                            <span class="material-symbols-outlined">schedule</span>
+                            Future Consideration (Lower Impact, High Effort)
+                        </h4>
+                        <p style="color: #9ca3af; font-size: 0.875rem; margin-top: 0.5rem;">No stories in this quadrant - good prioritization!</p>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button class="copy-btn" onclick="alert('User stories copied to clipboard!')">
+                        <span class="material-symbols-outlined">content_copy</span>
+                        Copy All Stories
+                    </button>
+                    <button class="download-btn" onclick="alert('Downloading user-stories.md')">
+                        <span class="material-symbols-outlined">download</span>
+                        Download user-stories.md
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showGeneratedStories() {
+            document.getElementById('generated-stories').style.display = 'block';
+            event.target.style.display = 'none';
+        }
+
+        function switchView(viewType) {
+            // Update toggle buttons
+            document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.view-toggle-btn').classList.add('active');
+
+            // Show/hide views
+            const epicView = document.getElementById('epic-view');
+            const matrixView = document.getElementById('matrix-view');
+
+            if (viewType === 'epic' || viewType === 'actor') {
+                epicView.classList.remove('hidden');
+                matrixView.classList.remove('active');
+            } else if (viewType === 'matrix') {
+                epicView.classList.add('hidden');
+                matrixView.classList.add('active');
+            }
+        }
+    </script>
+</body>
+</html>
+

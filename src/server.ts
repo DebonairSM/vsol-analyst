@@ -14,6 +14,7 @@ import { requireAuth, requireAdmin } from "./auth/middleware";
 import { OpenAILLMProvider } from "./llm/OpenAILLMProvider";
 import { RequirementsExtractor } from "./analyst/RequirementsExtractor";
 import { DocumentGenerator } from "./analyst/DocumentGenerator";
+import { StoryGenerator } from "./analyst/StoryGenerator";
 import { SYSTEM_PROMPT_ANALYST, SYSTEM_PROMPT_POLISHER } from "./analyst/prompts";
 import { ChatMessage } from "./llm/LLMProvider";
 
@@ -111,6 +112,7 @@ app.use((req, res, next) => {
 
 const llm = new OpenAILLMProvider();
 const extractor = new RequirementsExtractor(llm);
+const storyGen = new StoryGenerator(llm);
 const docs = new DocumentGenerator();
 
 // Root route serves the chat UI
@@ -578,6 +580,88 @@ app.post("/analyst/extract", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Error extracting requirements:", error);
     res.status(500).json({ error: "Extraction failed" });
+  }
+});
+
+// Generate user stories endpoint (legacy - re-extracts requirements)
+app.post("/analyst/generate-stories", requireAuth, async (req, res) => {
+  try {
+    const { projectId } = req.body as { projectId: string };
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId required" });
+    }
+
+    const user = req.user as any;
+
+    // Verify project ownership and get latest session with attachments
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        company: {
+          userId: user.id,
+        },
+      },
+      include: {
+        sessions: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          include: {
+            attachments: true,
+          },
+        },
+      },
+    });
+
+    if (!project || !project.sessions.length) {
+      return res.status(404).json({ error: "No chat history found" });
+    }
+
+    const session = project.sessions[0];
+    const history = JSON.parse(session.history as string) as ChatMessage[];
+
+    // Create attachment resolver function
+    const resolveAttachment = async (attachmentId: string): Promise<string | null> => {
+      const attachment = await prisma.attachment.findUnique({
+        where: { id: attachmentId },
+      });
+      return attachment ? attachment.storedPath : null;
+    };
+
+    // First extract requirements from the transcript
+    const requirements = await extractor.extractFromTranscript(
+      history,
+      resolveAttachment
+    );
+
+    // Then generate user stories from the requirements
+    const userStories = await storyGen.generateFromRequirements(requirements);
+    const markdown = docs.generateUserStoriesMarkdown(userStories);
+
+    res.json({ userStories, markdown });
+  } catch (error) {
+    console.error("Error generating user stories:", error);
+    res.status(500).json({ error: "User story generation failed" });
+  }
+});
+
+// Generate user stories from cached requirements (optimized)
+app.post("/analyst/generate-stories-from-requirements", requireAuth, async (req, res) => {
+  try {
+    const { requirements } = req.body;
+
+    if (!requirements) {
+      return res.status(400).json({ error: "requirements object required" });
+    }
+
+    // Generate user stories directly from the provided requirements
+    const userStories = await storyGen.generateFromRequirements(requirements);
+    const markdown = docs.generateUserStoriesMarkdown(userStories);
+
+    res.json({ userStories, markdown });
+  } catch (error) {
+    console.error("Error generating user stories:", error);
+    res.status(500).json({ error: "User story generation failed" });
   }
 });
 

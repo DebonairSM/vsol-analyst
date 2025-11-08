@@ -1,4 +1,4 @@
-import { RequirementsSummary } from "./RequirementsTypes";
+import { RequirementsSummary, UserStoriesOutput } from "./RequirementsTypes";
 
 export class DocumentGenerator {
   generateRequirementsMarkdown(req: RequirementsSummary): string {
@@ -163,6 +163,58 @@ export class DocumentGenerator {
       for (const mod of req.candidateModules || []) {
         const modId = mod.name.replace(/\s+/g, "_");
         lines.push(`  ${actorId} --> ${modId}`);
+      }
+    }
+
+    return lines.join("\n");
+  }
+
+  generateUserStoriesMarkdown(userStories: UserStoriesOutput): string {
+    const lines: string[] = [];
+
+    lines.push(`# User Stories`);
+    lines.push("");
+    lines.push(
+      `**Total Stories:** ${userStories.totalStories} | ` +
+      `**Must-Have:** ${userStories.byPriority.mustHave} | ` +
+      `**Should-Have:** ${userStories.byPriority.shouldHave} | ` +
+      `**Nice-to-Have:** ${userStories.byPriority.niceToHave}`
+    );
+    lines.push("");
+    lines.push("---");
+    lines.push("");
+
+    // Group by Epic
+    for (const epic of userStories.epics) {
+      lines.push(`## Epic: ${epic.name}`);
+      lines.push("");
+      lines.push(`*${epic.description}*`);
+      lines.push("");
+
+      for (const story of epic.stories) {
+        lines.push(`### ${story.id}: ${story.title}`);
+        lines.push("");
+        lines.push(`**As a** ${story.actor}`);
+        lines.push(`**I want to** ${story.action}`);
+        lines.push(`**So that** ${story.benefit}`);
+        lines.push("");
+
+        lines.push(`**Priority:** ${story.priority} | **Effort:** ${story.effort}`);
+        if (story.storyPoints) {
+          lines.push(` | **Story Points:** ${story.storyPoints}`);
+        }
+        if (story.sprint) {
+          lines.push(` | **Sprint:** ${story.sprint}`);
+        }
+        lines.push("");
+
+        lines.push(`**Acceptance Criteria:**`);
+        for (const criterion of story.acceptanceCriteria) {
+          lines.push(`- [ ] ${criterion.description}`);
+        }
+        lines.push("");
+        lines.push("---");
+        lines.push("");
       }
     }
 

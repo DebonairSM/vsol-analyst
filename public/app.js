@@ -5,6 +5,7 @@ let isProcessing = false;
 let isInitialLoad = true;
 let recognition = null;
 let isRecording = false;
+let cachedRequirements = null; // Store extracted requirements to avoid re-extraction
 
 // DOM Elements
 const loginPage = document.getElementById('login-page');
@@ -131,6 +132,7 @@ async function showChat(project) {
     currentProject = project;
     projectTitle.textContent = project.name;
     chatContainer.innerHTML = '';
+    cachedRequirements = null; // Clear cached requirements when switching projects
     
     loginPage.classList.add('hidden');
     projectsPage.classList.remove('visible');
@@ -624,6 +626,9 @@ async function performExtraction() {
         
         const data = await response.json();
         
+        // Cache the requirements object for user story generation
+        cachedRequirements = data.requirements;
+        
         markdownOutput.value = data.markdown;
         mermaidOutput.value = data.mermaid;
         
@@ -693,6 +698,88 @@ function downloadMermaid() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `${currentProject.name}-workflow.mmd`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// User Stories Generation
+async function generateUserStories() {
+    if (!currentProject) return;
+    
+    const generateBtn = document.getElementById('generate-stories-btn');
+    const storiesLoading = document.getElementById('stories-loading');
+    const storiesOutput = document.getElementById('stories-output');
+    const userStoriesTextarea = document.getElementById('user-stories-output');
+    
+    // Hide button and show loading
+    generateBtn.style.display = 'none';
+    storiesLoading.style.display = 'block';
+    storiesOutput.style.display = 'none';
+    
+    try {
+        // Use cached requirements if available (faster, no LLM call to re-extract)
+        let response;
+        if (cachedRequirements) {
+            response = await fetch('/analyst/generate-stories-from-requirements', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requirements: cachedRequirements })
+            });
+        } else {
+            // Fallback to legacy endpoint that re-extracts requirements
+            response = await fetch('/analyst/generate-stories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId: currentProject.id })
+            });
+        }
+        
+        if (!response.ok) {
+            throw new Error('Failed to generate user stories');
+        }
+        
+        const data = await response.json();
+        
+        // Store the markdown for download
+        userStoriesTextarea.value = data.markdown;
+        
+        // Hide loading and show output
+        storiesLoading.style.display = 'none';
+        storiesOutput.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error generating user stories:', error);
+        alert('Failed to generate user stories. Please try again.');
+        
+        // Show button again on error
+        generateBtn.style.display = 'inline-flex';
+        storiesLoading.style.display = 'none';
+    }
+}
+
+function copyUserStories(event) {
+    const userStoriesTextarea = document.getElementById('user-stories-output');
+    const content = userStoriesTextarea.value;
+    navigator.clipboard.writeText(content).then(() => {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+
+function downloadUserStories() {
+    const userStoriesTextarea = document.getElementById('user-stories-output');
+    const content = userStoriesTextarea.value;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentProject.name}-user-stories.md`;
     a.click();
     URL.revokeObjectURL(url);
 }

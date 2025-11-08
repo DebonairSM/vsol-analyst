@@ -62,3 +62,38 @@ export interface RequirementsSummary {
   uploadedDocuments: UploadedDocument[];
 }
 
+export interface AcceptanceCriterion {
+  description: string;
+}
+
+export interface UserStory {
+  id: string;
+  epicName: string;
+  title: string;
+  actor: string;
+  action: string;
+  benefit: string;
+  acceptanceCriteria: AcceptanceCriterion[];
+  priority: "must-have" | "should-have" | "nice-to-have";
+  effort: "small" | "medium" | "large";
+  storyPoints?: number;
+  sprint?: number;
+}
+
+export interface Epic {
+  name: string;
+  description: string;
+  icon: string;
+  stories: UserStory[];
+}
+
+export interface UserStoriesOutput {
+  totalStories: number;
+  byPriority: {
+    mustHave: number;
+    shouldHave: number;
+    niceToHave: number;
+  };
+  epics: Epic[];
+}
+
