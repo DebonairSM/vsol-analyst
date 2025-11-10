@@ -1787,6 +1787,37 @@
                 </div>
                 <div class="output-section" style="margin-top: 1.5rem;">
                     <h4 style="margin-bottom: 0.5rem; color: #111827; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="material-symbols-outlined">account_tree</span>
+                        Detailed Flowchart
+                    </h4>
+                    <button id="generate-flowchart-btn" class="generate-stories-btn" onclick="generateFlowchart()" style="background: #7c3aed; color: white; box-shadow: 0 3px 10px rgba(124,58,237,0.3); padding: 0.875rem 1.5rem; border: none; border-radius: 10px; font-weight: 600; transition: all 0.3s; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 1rem; margin-bottom: 1rem;">
+                        <span class="material-symbols-outlined">account_tree</span>
+                        Generate Detailed Flowchart
+                    </button>
+                    <div id="flowchart-loading" style="display: none; text-align: center; padding: 2rem;">
+                        <img src="/assets/sunny-face.png" alt="Sunny" class="extraction-loading-avatar" width="80" height="80" style="width:80px;height:80px;margin:0 auto;">
+                        <h3 id="flowchart-status" style="margin-top: 1rem; color: #111827; font-size: 1.1rem;">Sunny is analyzing your system architecture...</h3>
+                        <div class="progress-container">
+                            <div class="progress-bar-wrapper">
+                                <div id="flowchart-progress-bar" class="progress-bar-fill"></div>
+                            </div>
+                            <div id="flowchart-percentage" class="progress-percentage">0%</div>
+                        </div>
+                        <p id="flowchart-tip" style="color: #6b7280; margin-top: 1rem; font-size: 0.95rem;">Workflow diagrams make it easier to visualize how your system will operate</p>
+                        <div class="loading-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                    <div id="flowchart-output" style="display: none;">
+                        <textarea id="detailed-flowchart-output" readonly style="width: 100%; min-height: 300px; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-family: monospace; font-size: 0.9rem; margin-bottom: 0.5rem;"></textarea>
+                        <button class="copy-btn" onclick="copyFlowchart(event)">Copy to Clipboard</button>
+                        <button class="download-btn" onclick="downloadFlowchart()">Download detailed-workflow.mmd</button>
+                    </div>
+                </div>
+                <div class="output-section" style="margin-top: 1.5rem;">
+                    <h4 style="margin-bottom: 0.5rem; color: #111827; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;">
                         <span class="material-symbols-outlined">auto_stories</span>
                         User Stories
                     </h4>

@@ -625,38 +625,33 @@ function clearLoadingIntervals() {
 
 // Animate progress bar smoothly to target with 1% increments
 function animateProgressTo(barId, percentageId, target) {
-    // Update target
-    targetProgress = target;
-    
     const progressBar = document.getElementById(barId);
     const percentageDisplay = document.getElementById(percentageId);
     
     if (!progressBar || !percentageDisplay) return;
     
-    // If no animation is running, start one
-    if (!progressAnimationInterval) {
+    // Jump immediately to the target milestone from backend
+    currentProgress = target;
+    targetProgress = target;
+    progressBar.style.width = currentProgress + '%';
+    percentageDisplay.textContent = currentProgress + '%';
+    
+    // Start slow 1% increments after reaching milestone (shows activity while waiting)
+    if (!progressAnimationInterval && currentProgress < 100) {
         progressAnimationInterval = setInterval(() => {
-            if (currentProgress < targetProgress) {
-                // Increment by 1% smoothly
-                currentProgress = Math.min(currentProgress + 1, targetProgress);
-                
+            // Only increment if we haven't hit a hard limit and still below 100
+            if (currentProgress < targetProgress + 4 && currentProgress < 100) {
+                currentProgress = Math.min(currentProgress + 1, 100);
                 progressBar.style.width = currentProgress + '%';
                 percentageDisplay.textContent = currentProgress + '%';
             }
-            // Keep running - we'll update targetProgress when backend sends new updates
-            // Only stop when we reach 100%
+            
+            // Stop when we reach 100%
             if (currentProgress >= 100) {
                 clearInterval(progressAnimationInterval);
                 progressAnimationInterval = null;
             }
-        }, 800); // Update every 800ms for smooth 1% increments
-    }
-    
-    // If target jumped ahead significantly, speed up to catch up
-    if (target > currentProgress + 10) {
-        // For big jumps, update faster temporarily
-        progressBar.style.width = currentProgress + '%';
-        percentageDisplay.textContent = currentProgress + '%';
+        }, 1000); // Slow 1% increments every second between milestones
     }
 }
 
@@ -671,16 +666,17 @@ function resetProgress() {
 }
 
 // Start rotating educational tips
-function startTipsRotation(tipElementId) {
+function startTipsRotation(tipElementId, customTips = null) {
     const tipElement = document.getElementById(tipElementId);
     if (!tipElement) return;
     
+    const tips = customTips || educationalTips;
     let currentTipIndex = 0;
     
     // Rotate tips every 4.5 seconds
     tipsInterval = setInterval(() => {
-        currentTipIndex = (currentTipIndex + 1) % educationalTips.length;
-        tipElement.textContent = educationalTips[currentTipIndex];
+        currentTipIndex = (currentTipIndex + 1) % tips.length;
+        tipElement.textContent = tips[currentTipIndex];
     }, 4500);
 }
 
@@ -713,10 +709,15 @@ async function performExtraction() {
     startTipsRotation('extraction-tip');
     
     try {
-        const response = await fetch('/analyst/extract-stream', {
+        // Use admin endpoint if in admin view, otherwise use regular endpoint
+        const endpoint = currentProject.isAdminView 
+            ? `/api/admin/projects/${currentProject.id}/extract`
+            : '/analyst/extract-stream';
+        
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ projectId: currentProject.id })
+            body: currentProject.isAdminView ? undefined : JSON.stringify({ projectId: currentProject.id })
         });
         
         if (!response.ok) {
@@ -766,8 +767,10 @@ async function performExtraction() {
                             // Animate progress smoothly to target
                             animateProgressTo('extraction-progress-bar', 'extraction-percentage', data.progress);
                             
-                            // Update status message immediately
-                            if (statusElement && data.stage) statusElement.textContent = data.stage;
+                            // Update status message (keep previous message if stage is empty)
+                            if (statusElement && data.stage) {
+                                statusElement.textContent = data.stage;
+                            }
                         }
                     } catch (e) {
                         console.error('Error parsing SSE data:', e);
@@ -786,15 +789,17 @@ async function performExtraction() {
         markdownOutput.value = finalData.markdown;
         mermaidOutput.value = finalData.mermaid;
         
-        // Backend already waited 2 seconds at 100%, just ensure animation is done
-        // Calculate remaining animation time to reach 100%
-        const remainingProgress = 100 - currentProgress;
-        const animationTime = remainingProgress > 0 ? (remainingProgress / 5) * 400 : 0;
-        
-        // Wait for animation to complete (backend already showed "Complete" for 2s)
-        if (animationTime > 0) {
-            await new Promise(resolve => setTimeout(resolve, animationTime + 500));
+        // Ensure we're at 100% and it's visible for a moment
+        const progressBar = document.getElementById('extraction-progress-bar');
+        const percentageDisplay = document.getElementById('extraction-percentage');
+        if (progressBar && percentageDisplay) {
+            progressBar.style.width = '100%';
+            percentageDisplay.textContent = '100%';
+            currentProgress = 100;
         }
+        
+        // Wait briefly to ensure 100% is visible (backend already waited 2s)
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Clear intervals before showing results
         clearLoadingIntervals();
@@ -959,8 +964,10 @@ async function generateUserStories() {
                                 // Animate progress smoothly to target
                                 animateProgressTo('stories-progress-bar', 'stories-percentage', data.progress);
                                 
-                                // Update status message immediately
-                                if (statusElement && data.stage) statusElement.textContent = data.stage;
+                                // Update status message (keep previous message if stage is empty)
+                                if (statusElement && data.stage) {
+                                    statusElement.textContent = data.stage;
+                                }
                             }
                         } catch (e) {
                             console.error('Error parsing SSE data:', e);
@@ -981,15 +988,15 @@ async function generateUserStories() {
             userStoriesTextarea.value = data.markdown;
         }
         
-        // Backend already waited 2 seconds at 100%, just ensure animation is done
-        // Calculate remaining animation time to reach 100%
-        const remainingProgress = 100 - currentProgress;
-        const animationTime = remainingProgress > 0 ? (remainingProgress / 5) * 400 : 0;
-        
-        // Wait for animation to complete (backend already showed "Complete" for 2s)
-        if (animationTime > 0) {
-            await new Promise(resolve => setTimeout(resolve, animationTime + 500));
+        // Ensure we're at 100% and it's visible for a moment
+        if (progressBar && percentageDisplay) {
+            progressBar.style.width = '100%';
+            percentageDisplay.textContent = '100%';
+            currentProgress = 100;
         }
+        
+        // Wait briefly to ensure 100% is visible (backend already waited 2s)
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Clear intervals before showing results
         clearLoadingIntervals();
@@ -1032,6 +1039,160 @@ function downloadUserStories() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `${currentProject.name}-user-stories.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Flowchart Generation
+async function generateFlowchart() {
+    if (!currentProject || !cachedRequirements) return;
+    
+    const generateBtn = document.getElementById('generate-flowchart-btn');
+    const flowchartLoading = document.getElementById('flowchart-loading');
+    const flowchartOutput = document.getElementById('flowchart-output');
+    const flowchartTextarea = document.getElementById('detailed-flowchart-output');
+    
+    // Reset status and tip text to initial values
+    const statusElement = document.getElementById('flowchart-status');
+    const tipElement = document.getElementById('flowchart-tip');
+    if (statusElement) statusElement.textContent = "Sunny is analyzing your system architecture...";
+    if (tipElement) tipElement.textContent = "Workflow diagrams make it easier to visualize how your system will operate";
+    
+    // Reset progress bar and state
+    resetProgress();
+    const progressBar = document.getElementById('flowchart-progress-bar');
+    const percentageDisplay = document.getElementById('flowchart-percentage');
+    if (progressBar) progressBar.style.width = '0%';
+    if (percentageDisplay) percentageDisplay.textContent = '0%';
+    
+    // Hide button and show loading
+    generateBtn.style.display = 'none';
+    flowchartLoading.style.display = 'block';
+    flowchartOutput.style.display = 'none';
+    
+    // Start tips rotation with flowchart-specific tips
+    const flowchartTips = [
+        "Workflow diagrams make it easier to visualize how your system will operate",
+        "Complex flowcharts show decision points and data flows",
+        "Visual workflows help identify bottlenecks before development begins",
+        "Detailed diagrams clarify system interactions and dependencies"
+    ];
+    startTipsRotation('flowchart-tip', flowchartTips);
+    
+    try {
+        const response = await fetch('/analyst/generate-flowchart-stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requirements: cachedRequirements })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to generate flowchart');
+        }
+        
+        // Process streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalData = null;
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // Keep incomplete line in buffer
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        
+                        if (data.error) {
+                            throw new Error(data.error);
+                        }
+                        
+                        if (data.complete) {
+                            // Store final result
+                            console.log('✅ Flowchart generation complete, received final data');
+                            finalData = data;
+                        } else if (data.progress !== undefined) {
+                            // Update progress bar and status
+                            console.log(`📊 Progress update: ${data.progress}% - ${data.stage}`);
+                            
+                            // Animate progress smoothly to target
+                            animateProgressTo('flowchart-progress-bar', 'flowchart-percentage', data.progress);
+                            
+                            // Update status message immediately
+                            if (statusElement && data.stage) statusElement.textContent = data.stage;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing SSE data:', e);
+                    }
+                }
+            }
+        }
+        
+        if (!finalData) {
+            throw new Error('No final data received');
+        }
+        
+        // Store the markdown for download
+        flowchartTextarea.value = finalData.markdown;
+        
+        // Backend already waited 1 second at 100%, just ensure animation is done
+        // Calculate remaining animation time to reach 100%
+        const remainingProgress = 100 - currentProgress;
+        const animationTime = remainingProgress > 0 ? (remainingProgress / 5) * 400 : 0;
+        
+        // Wait for animation to complete (backend already showed "Complete" for 1s)
+        if (animationTime > 0) {
+            await new Promise(resolve => setTimeout(resolve, animationTime + 300));
+        }
+        
+        // Clear intervals before showing results
+        clearLoadingIntervals();
+        
+        // Hide loading and show output
+        flowchartLoading.style.display = 'none';
+        flowchartOutput.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error generating flowchart:', error);
+        clearLoadingIntervals();
+        alert('Failed to generate flowchart. Please try again.');
+        
+        // Show button again on error
+        generateBtn.style.display = 'inline-flex';
+        flowchartLoading.style.display = 'none';
+    }
+}
+
+function copyFlowchart(event) {
+    const flowchartTextarea = document.getElementById('detailed-flowchart-output');
+    const content = flowchartTextarea.value;
+    navigator.clipboard.writeText(content).then(() => {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+
+function downloadFlowchart() {
+    const flowchartTextarea = document.getElementById('detailed-flowchart-output');
+    const content = flowchartTextarea.value;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentProject.name}-detailed-workflow.mmd`;
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -1181,11 +1342,11 @@ async function viewProjectChat(projectId) {
         adminPage.style.display = 'none';
         chatPage.classList.add('visible');
         
-        // Disable input for admin view
+        // Disable input for admin view (except extract button which admins can use)
         messageInput.disabled = true;
         sendBtn.disabled = true;
         polishBtn.disabled = true;
-        extractBtn.disabled = true;
+        extractBtn.disabled = false; // Enable extract for admins
         voiceBtn.disabled = true;
         messageInput.placeholder = 'Admin view - read only';
         

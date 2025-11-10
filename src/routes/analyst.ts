@@ -10,6 +10,7 @@ import { DocumentGenerator } from "../analyst/DocumentGenerator";
 import { StoryGenerator } from "../analyst/StoryGenerator";
 import { RequirementsRefinementPipeline } from "../analyst/RequirementsRefinementPipeline";
 import { UserStoryRefinementPipeline } from "../analyst/UserStoryRefinementPipeline";
+import { FlowchartGenerator } from "../analyst/FlowchartGenerator";
 import { SYSTEM_PROMPT_ANALYST, SYSTEM_PROMPT_POLISHER } from "../analyst/prompts";
 import { ChatMessage } from "../llm/LLMProvider";
 
@@ -19,8 +20,10 @@ const prisma = new PrismaClient();
 // Initialize services
 const llmMini = new OpenAILLMProvider({ defaultModel: "gpt-4o-mini" });
 const llmFull = new OpenAILLMProvider({ defaultModel: "gpt-4o" });
+const llmFlowchart = new OpenAILLMProvider({ defaultModel: "gpt-4o-2024-11-20" });
 const extractor = new RequirementsExtractor(llmMini);
 const storyGen = new StoryGenerator(llmMini);
+const flowchartGen = new FlowchartGenerator(llmFlowchart);
 const docs = new DocumentGenerator();
 const refinementPipeline = new RequirementsRefinementPipeline(
   llmMini,
@@ -324,9 +327,10 @@ router.post("/extract-stream", requireAuth, async (req, res) => {
 
     try {
       sendProgress(10, "Sunny is reviewing your conversation...");
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Start extraction
-      sendProgress(20, "Sunny is analyzing conversation context...");
+      sendProgress(20, "Sunny is preparing to extract requirements...");
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       const result = await refinementPipeline.extractWithRefinement(
         history,
@@ -338,12 +342,15 @@ router.post("/extract-stream", requireAuth, async (req, res) => {
         }
       );
       
-      sendProgress(95, "Sunny is finalizing documentation...");
+      sendProgress(95, "Completing...");
+      
+      // Wait a moment before 100%
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Send 100% progress
-      sendProgress(100, "Completing...");
+      sendProgress(100, "");
       
-      // Wait 2 seconds to let the user see 100% completing
+      // Wait 2 seconds to let the user see 100%
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Send final result
@@ -482,7 +489,11 @@ router.post("/generate-stories-stream", requireAuth, async (req, res) => {
     };
 
     try {
-      sendProgress(10, "Sunny is analyzing your requirements...");
+      sendProgress(10, "Sunny is reviewing requirements...");
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      sendProgress(20, "Sunny is preparing to generate stories...");
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       const result = await storyRefinementPipeline.generateWithRefinement(
         requirements,
@@ -493,12 +504,15 @@ router.post("/generate-stories-stream", requireAuth, async (req, res) => {
         }
       );
       
-      sendProgress(95, "Sunny is finalizing user stories...");
+      sendProgress(95, "Completing...");
+      
+      // Wait a moment before 100%
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Send 100% progress
-      sendProgress(100, "Completing...");
+      sendProgress(100, "");
       
-      // Wait 2 seconds to let the user see 100% completing
+      // Wait 2 seconds to let the user see 100%
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Send final result
@@ -517,6 +531,104 @@ router.post("/generate-stories-stream", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Error in generate-stories-stream:", error);
     res.status(500).json({ error: "User story generation failed" });
+  }
+});
+
+// Generate flowchart from cached requirements (optimized)
+router.post("/generate-flowchart-from-requirements", requireAuth, async (req, res) => {
+  try {
+    const { requirements } = req.body;
+
+    if (!requirements) {
+      return res.status(400).json({ error: "requirements object required" });
+    }
+
+    // Generate complex flowchart using dedicated model
+    const mermaidDiagram = await flowchartGen.generateFlowchart(requirements);
+    const markdown = flowchartGen.wrapInMarkdown(mermaidDiagram);
+
+    res.json({ 
+      mermaidDiagram,
+      markdown,
+    });
+  } catch (error) {
+    console.error("Error generating flowchart:", error);
+    res.status(500).json({ error: "Flowchart generation failed" });
+  }
+});
+
+// Generate flowchart with progress streaming
+router.post("/generate-flowchart-stream", requireAuth, async (req, res) => {
+  try {
+    const { requirements } = req.body;
+
+    if (!requirements) {
+      return res.status(400).json({ error: "requirements object required" });
+    }
+
+    // Set up SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    res.flushHeaders(); // Flush headers immediately
+
+    // Helper function to send progress updates
+    const sendProgress = (progress: number, stage: string) => {
+      res.write(`data: ${JSON.stringify({ progress, stage })}\n\n`);
+      // Flush after each write to ensure immediate delivery
+      if (typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
+    };
+
+     try {
+       sendProgress(10, "Sunny is analyzing your system architecture...");
+       await new Promise(resolve => setTimeout(resolve, 1500));
+       
+       sendProgress(20, "Sunny is preparing to map workflows...");
+       await new Promise(resolve => setTimeout(resolve, 1500));
+       
+       sendProgress(30, "Sunny is mapping actor interactions...");
+       await new Promise(resolve => setTimeout(resolve, 1000));
+       
+       sendProgress(40, "Sunny is identifying workflow patterns...");
+      
+      // Generate the flowchart
+      const mermaidDiagram = await flowchartGen.generateFlowchart(requirements);
+      
+      sendProgress(75, "Sunny is creating detailed workflow diagrams...");
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+       sendProgress(90, "Sunny is finalizing your flowchart...");
+       const markdown = flowchartGen.wrapInMarkdown(mermaidDiagram);
+       
+       sendProgress(95, "Completing...");
+       
+       // Wait a moment before 100%
+       await new Promise(resolve => setTimeout(resolve, 1000));
+       
+       // Send 100% progress
+       sendProgress(100, "");
+       
+       // Wait 2 seconds to let the user see 100%
+       await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Send final result
+      res.write(`data: ${JSON.stringify({ 
+        complete: true,
+        mermaidDiagram,
+        markdown,
+      })}\n\n`);
+      res.end();
+    } catch (error) {
+      console.error("Error in flowchart generation:", error);
+      res.write(`data: ${JSON.stringify({ error: "Flowchart generation failed" })}\n\n`);
+      res.end();
+    }
+  } catch (error) {
+    console.error("Error in generate-flowchart-stream:", error);
+    res.status(500).json({ error: "Flowchart generation failed" });
   }
 });
 
