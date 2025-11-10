@@ -115,13 +115,18 @@ export class UserStoryRefinementPipeline {
    * Run the full story generation pipeline with optional refinement.
    */
   async generateWithRefinement(
-    requirements: RequirementsSummary
+    requirements: RequirementsSummary,
+    onProgress?: (progress: number, stage: string) => void
   ): Promise<StoryRefinementPipelineResult> {
     console.log("🚀 [Story Generation] Starting with gpt-4o-mini");
+    
+    if (onProgress) onProgress(30, "Sunny is crafting user stories...");
     
     // 1) First pass with mini model
     const baseStories = await this.storyGen.generateFromRequirements(requirements);
 
+    if (onProgress) onProgress(55, "Sunny is analyzing story quality...");
+    
     // 2) Analyze quality
     const metrics = this.storyGen.analyzeStoryQuality(baseStories);
     console.log(`📊 [Story Quality] Score: ${metrics.totalQualityScore}/100`);
@@ -142,16 +147,23 @@ export class UserStoryRefinementPipeline {
 
     if (this.needsRefinement(metrics)) {
       console.log("🔄 [Story Refinement] Quality issues detected, refining with gpt-4o");
+      if (onProgress) onProgress(65, "Sunny is refining story quality...");
+      
       finalStories = await this.refineStories(requirements, baseStories, metrics);
       wasRefined = true;
+      
+      if (onProgress) onProgress(80, "Sunny is verifying improvements...");
       
       // Re-analyze to show improvement
       const refinedMetrics = this.storyGen.analyzeStoryQuality(finalStories);
       console.log(`✅ [Story Refinement] Complete. New score: ${refinedMetrics.totalQualityScore}/100`);
     } else {
       console.log("✅ [Story Generation] Quality acceptable, using gpt-4o-mini result");
+      if (onProgress) onProgress(75, "Sunny is organizing user stories...");
     }
 
+    if (onProgress) onProgress(90, "Sunny is generating documentation...");
+    
     // 4) Generate markdown
     const markdown = this.markdownGenerator(finalStories);
 

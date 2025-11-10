@@ -6,9 +6,10 @@ let isInitialLoad = true;
 let recognition = null;
 let isRecording = false;
 let cachedRequirements = null; // Store extracted requirements to avoid re-extraction
-let progressInterval = null; // Track progress update intervals
 let tipsInterval = null; // Track tips rotation intervals
-let progressBarInterval = null; // Track progress bar animation
+let progressAnimationInterval = null; // Track progress bar animation
+let currentProgress = 0; // Current progress for smooth animation
+let targetProgress = 0; // Target progress from backend
 
 // Educational tips to rotate during loading
 const educationalTips = [
@@ -588,7 +589,8 @@ function showOutputModal() {
     if (statusElement) statusElement.textContent = "Sunny is reviewing your conversation...";
     if (tipElement) tipElement.textContent = educationalTips[0];
     
-    // Reset progress bar
+    // Reset progress bar and state
+    resetProgress();
     const progressBar = document.getElementById('extraction-progress-bar');
     const percentageDisplay = document.getElementById('extraction-percentage');
     if (progressBar) progressBar.style.width = '0%';
@@ -611,47 +613,65 @@ function showOutputResults() {
 
 // Helper function to clear all loading intervals
 function clearLoadingIntervals() {
-    if (progressInterval) {
-        clearInterval(progressInterval);
-        progressInterval = null;
-    }
     if (tipsInterval) {
         clearInterval(tipsInterval);
         tipsInterval = null;
     }
-    if (progressBarInterval) {
-        clearInterval(progressBarInterval);
-        progressBarInterval = null;
+    if (progressAnimationInterval) {
+        clearInterval(progressAnimationInterval);
+        progressAnimationInterval = null;
     }
 }
 
-// Animate progress bar from 0 to 100% over estimated duration
-function animateProgressBar(barId, percentageId, estimatedDuration) {
+// Animate progress bar smoothly to target with 5% increments
+function animateProgressTo(barId, percentageId, target) {
+    // Clear any existing animation
+    if (progressAnimationInterval) {
+        clearInterval(progressAnimationInterval);
+        progressAnimationInterval = null;
+    }
+    
+    targetProgress = target;
+    
+    // Calculate how long to take (at least 2 seconds, scale with distance)
+    const distance = Math.abs(targetProgress - currentProgress);
+    const duration = Math.max(2000, distance * 100); // 100ms per percent, min 2 seconds
+    const steps = Math.ceil(distance / 5); // Number of 5% steps
+    const intervalTime = steps > 0 ? duration / steps : 100;
+    
     const progressBar = document.getElementById(barId);
     const percentageDisplay = document.getElementById(percentageId);
+    
     if (!progressBar || !percentageDisplay) return;
     
-    let currentProgress = 0;
-    const startTime = Date.now();
-    
-    // Update every 100ms for smooth animation
-    progressBarInterval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        // Calculate progress (reaches 95% at estimated duration, holds there until complete)
-        currentProgress = Math.min(95, (elapsed / estimatedDuration) * 100);
-        
-        progressBar.style.width = currentProgress + '%';
-        percentageDisplay.textContent = Math.floor(currentProgress) + '%';
-    }, 100);
+    progressAnimationInterval = setInterval(() => {
+        if (currentProgress < targetProgress) {
+            // Increment by 5%, but don't overshoot
+            currentProgress = Math.min(currentProgress + 5, targetProgress);
+            
+            progressBar.style.width = currentProgress + '%';
+            percentageDisplay.textContent = currentProgress + '%';
+            
+            // If we've reached the target, clear the interval
+            if (currentProgress >= targetProgress) {
+                clearInterval(progressAnimationInterval);
+                progressAnimationInterval = null;
+            }
+        } else {
+            // Already at or past target
+            clearInterval(progressAnimationInterval);
+            progressAnimationInterval = null;
+        }
+    }, intervalTime);
 }
 
-// Complete the progress bar animation to 100%
-function completeProgressBar(barId, percentageId) {
-    const progressBar = document.getElementById(barId);
-    const percentageDisplay = document.getElementById(percentageId);
-    if (progressBar && percentageDisplay) {
-        progressBar.style.width = '100%';
-        percentageDisplay.textContent = '100%';
+// Reset progress state
+function resetProgress() {
+    currentProgress = 0;
+    targetProgress = 0;
+    if (progressAnimationInterval) {
+        clearInterval(progressAnimationInterval);
+        progressAnimationInterval = null;
     }
 }
 
@@ -667,44 +687,6 @@ function startTipsRotation(tipElementId) {
         currentTipIndex = (currentTipIndex + 1) % educationalTips.length;
         tipElement.textContent = educationalTips[currentTipIndex];
     }, 4500);
-}
-
-// Update extraction progress through stages
-function startExtractionProgress() {
-    const statusElement = document.getElementById('extraction-status');
-    if (!statusElement) return;
-    
-    let stage = 0;
-    const stages = [
-        "Sunny is reviewing your conversation...",
-        "Sunny is identifying key requirements...",
-        "Sunny is mapping out your workflows..."
-    ];
-    
-    // Update progress every 3 seconds
-    progressInterval = setInterval(() => {
-        stage = (stage + 1) % stages.length;
-        statusElement.textContent = stages[stage];
-    }, 3000);
-}
-
-// Update user stories generation progress through stages
-function startStoriesProgress() {
-    const statusElement = document.getElementById('stories-status');
-    if (!statusElement) return;
-    
-    let stage = 0;
-    const stages = [
-        "Sunny is analyzing your requirements...",
-        "Sunny is crafting user stories...",
-        "Sunny is organizing documentation..."
-    ];
-    
-    // Update progress every 3 seconds
-    progressInterval = setInterval(() => {
-        stage = (stage + 1) % stages.length;
-        statusElement.textContent = stages[stage];
-    }, 3000);
 }
 
 function hideOutputModal() {
@@ -732,15 +714,11 @@ async function performExtraction() {
     // Show modal with loading animation
     showOutputModal();
     
-    // Start dynamic progress updates and tips rotation
-    startExtractionProgress();
+    // Start tips rotation only
     startTipsRotation('extraction-tip');
     
-    // Start progress bar animation (estimated 15 seconds for extraction)
-    animateProgressBar('extraction-progress-bar', 'extraction-percentage', 15000);
-    
     try {
-        const response = await fetch('/analyst/extract', {
+        const response = await fetch('/analyst/extract-stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ projectId: currentProject.id })
@@ -757,16 +735,61 @@ async function performExtraction() {
             throw new Error('Extraction failed');
         }
         
-        const data = await response.json();
+        // Process the streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalData = null;
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // Keep incomplete line in buffer
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        
+                        if (data.error) {
+                            throw new Error(data.error);
+                        }
+                        
+                        if (data.complete) {
+                            // Store final result
+                            console.log('✅ Extraction complete, received final data');
+                            finalData = data;
+                        } else if (data.progress !== undefined) {
+                            // Update progress bar and status
+                            console.log(`📊 Progress update: ${data.progress}% - ${data.stage}`);
+                            const statusElement = document.getElementById('extraction-status');
+                            
+                            // Animate progress smoothly to target
+                            animateProgressTo('extraction-progress-bar', 'extraction-percentage', data.progress);
+                            
+                            // Update status message immediately
+                            if (statusElement && data.stage) statusElement.textContent = data.stage;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing SSE data:', e);
+                    }
+                }
+            }
+        }
+        
+        if (!finalData) {
+            throw new Error('No final data received');
+        }
         
         // Cache the requirements object for user story generation
-        cachedRequirements = data.requirements;
+        cachedRequirements = finalData.requirements;
         
-        markdownOutput.value = data.markdown;
-        mermaidOutput.value = data.mermaid;
-        
-        // Complete progress bar to 100%
-        completeProgressBar('extraction-progress-bar', 'extraction-percentage');
+        markdownOutput.value = finalData.markdown;
+        mermaidOutput.value = finalData.mermaid;
         
         // Brief pause to show 100% before transitioning
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -860,7 +883,8 @@ async function generateUserStories() {
     if (statusElement) statusElement.textContent = "Sunny is analyzing your requirements...";
     if (tipElement) tipElement.textContent = educationalTips[2]; // Use user stories tip
     
-    // Reset progress bar
+    // Reset progress bar and state
+    resetProgress();
     const progressBar = document.getElementById('stories-progress-bar');
     const percentageDisplay = document.getElementById('stories-percentage');
     if (progressBar) progressBar.style.width = '0%';
@@ -871,18 +895,14 @@ async function generateUserStories() {
     storiesLoading.style.display = 'block';
     storiesOutput.style.display = 'none';
     
-    // Start dynamic progress updates and tips rotation
-    startStoriesProgress();
+    // Start tips rotation only
     startTipsRotation('stories-tip');
-    
-    // Start progress bar animation (estimated 12 seconds for user stories)
-    animateProgressBar('stories-progress-bar', 'stories-percentage', 12000);
     
     try {
         // Use cached requirements if available (faster, no LLM call to re-extract)
         let response;
         if (cachedRequirements) {
-            response = await fetch('/analyst/generate-stories-from-requirements', {
+            response = await fetch('/analyst/generate-stories-stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ requirements: cachedRequirements })
@@ -900,13 +920,64 @@ async function generateUserStories() {
             throw new Error('Failed to generate user stories');
         }
         
-        const data = await response.json();
-        
-        // Store the markdown for download
-        userStoriesTextarea.value = data.markdown;
-        
-        // Complete progress bar to 100%
-        completeProgressBar('stories-progress-bar', 'stories-percentage');
+        // Check if we're using streaming
+        if (cachedRequirements) {
+            // Process streaming response
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let finalData = null;
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep incomplete line in buffer
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            
+                            if (data.error) {
+                                throw new Error(data.error);
+                            }
+                            
+                            if (data.complete) {
+                                // Store final result
+                                console.log('✅ Story generation complete, received final data');
+                                finalData = data;
+                            } else if (data.progress !== undefined) {
+                                // Update progress bar and status
+                                console.log(`📊 Progress update: ${data.progress}% - ${data.stage}`);
+                                
+                                // Animate progress smoothly to target
+                                animateProgressTo('stories-progress-bar', 'stories-percentage', data.progress);
+                                
+                                // Update status message immediately
+                                if (statusElement && data.stage) statusElement.textContent = data.stage;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing SSE data:', e);
+                        }
+                    }
+                }
+            }
+            
+            if (!finalData) {
+                throw new Error('No final data received');
+            }
+            
+            // Store the markdown for download
+            userStoriesTextarea.value = finalData.markdown;
+        } else {
+            // Non-streaming fallback
+            const data = await response.json();
+            userStoriesTextarea.value = data.markdown;
+        }
         
         // Brief pause to show 100% before transitioning
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -1894,3 +1965,4 @@ document.getElementById('seed-data-modal')?.addEventListener('click', (e) => {
 
 // Initialize on page load
 init();
+

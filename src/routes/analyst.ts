@@ -261,6 +261,106 @@ router.post("/extract", requireAuth, async (req, res) => {
   }
 });
 
+// Extract requirements with progress streaming
+router.post("/extract-stream", requireAuth, async (req, res) => {
+  try {
+    const { projectId } = req.body as { projectId: string };
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId required" });
+    }
+
+    const user = req.user as any;
+
+    // Verify project ownership and get latest session with attachments
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        company: {
+          userId: user.id,
+        },
+      },
+      include: {
+        sessions: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          include: {
+            attachments: true,
+          },
+        },
+      },
+    });
+
+    if (!project || !project.sessions.length) {
+      return res.status(404).json({ error: "No chat history found" });
+    }
+
+    const session = project.sessions[0];
+    const history = JSON.parse(session.history as string) as ChatMessage[];
+
+    // Create attachment resolver function
+    const resolveAttachment = async (attachmentId: string): Promise<string | null> => {
+      const attachment = await prisma.attachment.findUnique({
+        where: { id: attachmentId },
+      });
+      return attachment ? attachment.storedPath : null;
+    };
+
+    // Set up SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    res.flushHeaders(); // Flush headers immediately
+
+    // Helper function to send progress updates
+    const sendProgress = (progress: number, stage: string) => {
+      res.write(`data: ${JSON.stringify({ progress, stage })}\n\n`);
+      // Flush after each write to ensure immediate delivery
+      if (typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
+    };
+
+    try {
+      sendProgress(10, "Sunny is reviewing your conversation...");
+      
+      // Start extraction
+      sendProgress(20, "Sunny is analyzing conversation context...");
+      
+      const result = await refinementPipeline.extractWithRefinement(
+        history,
+        resolveAttachment,
+        (progress: number, stage: string) => {
+          // Progress callback from pipeline
+          console.log(`📊 [Progress Update] ${progress}% - ${stage}`);
+          sendProgress(progress, stage);
+        }
+      );
+      
+      sendProgress(95, "Sunny is finalizing documentation...");
+      
+      // Send final result
+      sendProgress(100, "Complete");
+      res.write(`data: ${JSON.stringify({ 
+        complete: true,
+        requirements: result.requirements, 
+        markdown: result.markdown, 
+        mermaid: result.mermaid,
+        wasRefined: result.wasRefined,
+        metrics: result.metrics,
+      })}\n\n`);
+      res.end();
+    } catch (error) {
+      res.write(`data: ${JSON.stringify({ error: "Extraction failed" })}\n\n`);
+      res.end();
+    }
+  } catch (error) {
+    console.error("Error in extract-stream:", error);
+    res.status(500).json({ error: "Extraction failed" });
+  }
+});
+
 // Generate user stories endpoint (legacy - re-extracts requirements)
 router.post("/generate-stories", requireAuth, async (req, res) => {
   try {
@@ -347,6 +447,65 @@ router.post("/generate-stories-from-requirements", requireAuth, async (req, res)
     });
   } catch (error) {
     console.error("Error generating user stories:", error);
+    res.status(500).json({ error: "User story generation failed" });
+  }
+});
+
+// Generate user stories with progress streaming
+router.post("/generate-stories-stream", requireAuth, async (req, res) => {
+  try {
+    const { requirements } = req.body;
+
+    if (!requirements) {
+      return res.status(400).json({ error: "requirements object required" });
+    }
+
+    // Set up SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    res.flushHeaders(); // Flush headers immediately
+
+    // Helper function to send progress updates
+    const sendProgress = (progress: number, stage: string) => {
+      res.write(`data: ${JSON.stringify({ progress, stage })}\n\n`);
+      // Flush after each write to ensure immediate delivery
+      if (typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
+    };
+
+    try {
+      sendProgress(10, "Sunny is analyzing your requirements...");
+      
+      const result = await storyRefinementPipeline.generateWithRefinement(
+        requirements,
+        (progress: number, stage: string) => {
+          // Progress callback from pipeline
+          console.log(`📊 [Progress Update] ${progress}% - ${stage}`);
+          sendProgress(progress, stage);
+        }
+      );
+      
+      sendProgress(95, "Sunny is finalizing user stories...");
+      
+      // Send final result
+      sendProgress(100, "Complete");
+      res.write(`data: ${JSON.stringify({ 
+        complete: true,
+        userStories: result.userStories, 
+        markdown: result.markdown,
+        wasRefined: result.wasRefined,
+        metrics: result.metrics,
+      })}\n\n`);
+      res.end();
+    } catch (error) {
+      res.write(`data: ${JSON.stringify({ error: "User story generation failed" })}\n\n`);
+      res.end();
+    }
+  } catch (error) {
+    console.error("Error in generate-stories-stream:", error);
     res.status(500).json({ error: "User story generation failed" });
   }
 });

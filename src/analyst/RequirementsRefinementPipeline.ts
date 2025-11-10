@@ -138,16 +138,43 @@ export class RequirementsRefinementPipeline {
    */
   async extractWithRefinement(
     history: ChatMessage[],
-    resolveAttachment?: (id: string) => Promise<string | null>
+    resolveAttachment?: (id: string) => Promise<string | null>,
+    onProgress?: (progress: number, stage: string) => void
   ): Promise<RefinementPipelineResult> {
     console.log("🚀 [Requirements Extraction] Starting with gpt-4o-mini");
     
-    // 1) First pass with mini model
+    if (onProgress) onProgress(25, "Sunny is analyzing conversation...");
+    
+    // Track progress during extraction with periodic updates
+    let currentExtractProgress = 25;
+    const progressMessages = [
+      "Sunny is processing conversation...",
+      "Sunny is identifying key features...",
+      "Sunny is mapping system components...",
+      "Sunny is structuring requirements..."
+    ];
+    let messageIndex = 0;
+    
+    const progressInterval = setInterval(() => {
+      if (currentExtractProgress < 55) {
+        currentExtractProgress += 5;
+        const message = progressMessages[messageIndex % progressMessages.length];
+        if (onProgress) onProgress(currentExtractProgress, message);
+        messageIndex++;
+      }
+    }, 2000); // Update every 2 seconds during extraction
+    
+    // 1) First pass with mini model (this is the slow part - most time spent here)
     const baseSummary = await this.extractor.extractFromTranscript(
       history,
       resolveAttachment
     );
+    
+    // Clear the progress interval
+    clearInterval(progressInterval);
 
+    if (onProgress) onProgress(60, "Sunny is analyzing requirements quality...");
+    
     // 2) Generate metrics
     const metrics = this.docs.analyzeMermaidRelationships(baseSummary);
     console.log("📊 [Requirements Analysis] Diagram relationship analysis complete");
@@ -171,9 +198,13 @@ export class RequirementsRefinementPipeline {
 
     if (this.needsRefinement(metrics)) {
       console.log("🔄 [Requirements Refinement] Issues detected, refining with gpt-4o");
+      if (onProgress) onProgress(65, "Sunny is refining requirements for quality...");
+      
       const transcript = this.buildTranscript(history);
       finalSummary = await this.refineRequirements(transcript, baseSummary, metrics);
       wasRefined = true;
+      
+      if (onProgress) onProgress(80, "Sunny is verifying improvements...");
       
       // Re-analyze to show improvement
       const refinedMetrics = this.docs.analyzeMermaidRelationships(finalSummary);
@@ -185,8 +216,11 @@ export class RequirementsRefinementPipeline {
       console.log(`✅ [Requirements Refinement] Complete. Fixed ${issuesFixed} relationship issues`);
     } else {
       console.log("✅ [Requirements Extraction] No issues detected, using gpt-4o-mini result");
+      if (onProgress) onProgress(75, "Sunny is generating workflow diagrams...");
     }
 
+    if (onProgress) onProgress(90, "Sunny is generating documentation...");
+    
     // 4) Generate final documents
     const markdown = this.docs.generateRequirementsMarkdown(finalSummary);
     const mermaid = this.docs.generateMermaidFlow(finalSummary);
