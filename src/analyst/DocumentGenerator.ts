@@ -13,6 +13,17 @@ import { RequirementsSummary, UserStoriesOutput, Actor, CandidateModule } from "
  */
 
 /**
+ * Metrics returned by analyzeMermaidRelationships to diagnose
+ * structural issues in the generated workflow diagram.
+ */
+export interface MermaidMetrics {
+  actorsWithNoConnections: string[];
+  modulesWithNoConnections: string[];
+  suspiciousClientEdges: string[];
+  keyModulesMissingOrOrphaned: string[];
+}
+
+/**
  * Expectations for RequirementsSummary (for relationship inference):
  * - painPoints?: { description: string }[]
  * - primaryGoal?: string
@@ -663,6 +674,157 @@ export class DocumentGenerator {
     }
 
     return lines.join("\n");
+  }
+
+  /**
+   * Analyze the relationships in a RequirementsSummary and return metrics
+   * indicating potential structural issues in the Mermaid diagram.
+   * 
+   * This method runs the same relationship inference as generateMermaidFlow,
+   * but returns diagnostics instead of the diagram itself.
+   */
+  analyzeMermaidRelationships(req: RequirementsSummary): MermaidMetrics {
+    const metrics: MermaidMetrics = {
+      actorsWithNoConnections: [],
+      modulesWithNoConnections: [],
+      suspiciousClientEdges: [],
+      keyModulesMissingOrOrphaned: [],
+    };
+
+    const actors = req.mainActors || [];
+    const modules = req.candidateModules || [];
+
+    if (actors.length === 0 || modules.length === 0) {
+      return metrics;
+    }
+
+    // Track connections per actor and module
+    const actorConnections = new Map<string, number>();
+    const moduleConnections = new Map<string, number>();
+
+    for (const actor of actors) {
+      actorConnections.set(actor.name, 0);
+    }
+    for (const mod of modules) {
+      moduleConnections.set(mod.name, 0);
+    }
+
+    // Precompute actor keywords and module data
+    const actorKeywordCache = new Map<string, string[]>();
+    for (const actor of actors) {
+      actorKeywordCache.set(actor.name, this.extractActorKeywords(actor.name));
+    }
+
+    const moduleDataMap = new Map<string, {
+      descWords: Set<string>,
+      nameWords: Set<string>
+    }>();
+    for (const mod of modules) {
+      moduleDataMap.set(mod.name, {
+        descWords: this.normalizeText(mod.description || ""),
+        nameWords: this.normalizeText(mod.name)
+      });
+    }
+
+    // Run scoring to find connections
+    for (const actor of actors) {
+      const actorKeywords = actorKeywordCache.get(actor.name)!;
+      const perActorScores = new Map<string, number>();
+      let connections = 0;
+
+      for (const mod of modules) {
+        const md = moduleDataMap.get(mod.name);
+        if (!md) continue;
+
+        const score = this.scoreActorModuleRelation(
+          actor, mod, req, actorKeywords, md.descWords, md.nameWords
+        );
+
+        perActorScores.set(mod.name, score);
+
+        if (score >= this.scoreThreshold) {
+          connections++;
+          actorConnections.set(actor.name, actorConnections.get(actor.name)! + 1);
+          moduleConnections.set(mod.name, moduleConnections.get(mod.name)! + 1);
+        }
+      }
+
+      // Check fallback
+      if (connections === 0) {
+        const fallback = this.findBestFallbackModule(actor, modules, perActorScores);
+        if (fallback && fallback.score > 0) {
+          actorConnections.set(actor.name, 1);
+          moduleConnections.set(fallback.module.name, moduleConnections.get(fallback.module.name)! + 1);
+        }
+      }
+    }
+
+    // Identify actors with no connections
+    for (const actor of actors) {
+      if (actorConnections.get(actor.name) === 0) {
+        metrics.actorsWithNoConnections.push(actor.name);
+      }
+    }
+
+    // Identify modules with no connections
+    for (const mod of modules) {
+      if (moduleConnections.get(mod.name) === 0) {
+        metrics.modulesWithNoConnections.push(mod.name);
+      }
+    }
+
+    // Check for suspicious client edges
+    const clientActors = actors.filter(a => {
+      const nameLower = a.name.toLowerCase();
+      return CLIENT_ROLES.some(role => nameLower.includes(role));
+    });
+
+    for (const clientActor of clientActors) {
+      const actorKeywords = actorKeywordCache.get(clientActor.name)!;
+      
+      for (const mod of modules) {
+        const md = moduleDataMap.get(mod.name);
+        if (!md) continue;
+
+        const score = this.scoreActorModuleRelation(
+          clientActor, mod, req, actorKeywords, md.descWords, md.nameWords
+        );
+
+        // If client connects to a non-portal, non-client-facing module, flag it
+        if (score >= this.scoreThreshold) {
+          const modNameLower = mod.name.toLowerCase();
+          const isClientFacing = modNameLower.includes("portal") || 
+                                 modNameLower.includes("client") ||
+                                 modNameLower.includes("viewing");
+          
+          if (!isClientFacing) {
+            metrics.suspiciousClientEdges.push(`${clientActor.name} --> ${mod.name}`);
+          }
+        }
+      }
+    }
+
+    // Check for key modules that are orphaned
+    const keyModulePatterns = [
+      "invoice submission portal",
+      "status tracking",
+      "reporting and analytics",
+      "workflow visualization dashboard",
+      "dashboard",
+    ];
+
+    for (const mod of modules) {
+      const modNameLower = mod.name.toLowerCase();
+      const isKeyModule = keyModulePatterns.some(pattern => 
+        modNameLower.includes(pattern)
+      );
+
+      if (isKeyModule && moduleConnections.get(mod.name) === 0) {
+        metrics.keyModulesMissingOrOrphaned.push(mod.name);
+      }
+    }
+
+    return metrics;
   }
 }
 

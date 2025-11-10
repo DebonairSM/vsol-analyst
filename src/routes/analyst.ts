@@ -8,6 +8,7 @@ import { OpenAILLMProvider } from "../llm/OpenAILLMProvider";
 import { RequirementsExtractor } from "../analyst/RequirementsExtractor";
 import { DocumentGenerator } from "../analyst/DocumentGenerator";
 import { StoryGenerator } from "../analyst/StoryGenerator";
+import { RequirementsRefinementPipeline } from "../analyst/RequirementsRefinementPipeline";
 import { SYSTEM_PROMPT_ANALYST, SYSTEM_PROMPT_POLISHER } from "../analyst/prompts";
 import { ChatMessage } from "../llm/LLMProvider";
 
@@ -15,10 +16,17 @@ const router = Router();
 const prisma = new PrismaClient();
 
 // Initialize services
-const llm = new OpenAILLMProvider();
-const extractor = new RequirementsExtractor(llm);
-const storyGen = new StoryGenerator(llm);
+const llmMini = new OpenAILLMProvider({ defaultModel: "gpt-4o-mini" });
+const llmFull = new OpenAILLMProvider({ defaultModel: "gpt-4o" });
+const extractor = new RequirementsExtractor(llmMini);
+const storyGen = new StoryGenerator(llmMini);
 const docs = new DocumentGenerator();
+const refinementPipeline = new RequirementsRefinementPipeline(
+  llmMini,
+  llmFull,
+  extractor,
+  docs
+);
 
 // Configure multer for file uploads
 const imageStorage = multer.diskStorage({
@@ -142,7 +150,7 @@ router.post("/chat", requireAuth, async (req, res) => {
     };
 
     // Get AI reply with attachment resolution
-    const reply = await llm.chat({
+    const reply = await llmMini.chat({
       messages: history,
       temperature: 0.4,
       resolveAttachment,
@@ -209,14 +217,19 @@ router.post("/extract", requireAuth, async (req, res) => {
       return attachment ? attachment.storedPath : null;
     };
 
-    const requirements = await extractor.extractFromTranscript(
+    // Use the refinement pipeline instead of direct extraction
+    const result = await refinementPipeline.extractWithRefinement(
       history,
       resolveAttachment
     );
-    const md = docs.generateRequirementsMarkdown(requirements);
-    const mermaid = docs.generateMermaidFlow(requirements);
 
-    res.json({ requirements, markdown: md, mermaid });
+    res.json({ 
+      requirements: result.requirements, 
+      markdown: result.markdown, 
+      mermaid: result.mermaid,
+      wasRefined: result.wasRefined,
+      metrics: result.metrics,
+    });
   } catch (error) {
     console.error("Error extracting requirements:", error);
     res.status(500).json({ error: "Extraction failed" });
@@ -319,7 +332,7 @@ router.post("/polish", requireAuth, async (req, res) => {
     }
 
     // Use the LLM to polish the text
-    const polished = await llm.chat({
+    const polished = await llmMini.chat({
       messages: [
         { role: "system", content: SYSTEM_PROMPT_POLISHER },
         { role: "user", content: text },
@@ -471,7 +484,7 @@ router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), asyn
     };
 
     // Add an acknowledgment from the assistant
-    const acknowledgment = await llm.chat({
+    const acknowledgment = await llmMini.chat({
       messages: history,
       temperature: 0.4,
       resolveAttachment,
@@ -604,7 +617,7 @@ router.post("/upload-image", requireAuth, uploadImage.single("file"), async (req
       return attachment ? attachment.storedPath : null;
     };
 
-    const analysis = await llm.chat({
+    const analysis = await llmMini.chat({
       messages: tempHistory as ChatMessage[],
       temperature: 0.4,
       resolveAttachment,
