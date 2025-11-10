@@ -197,8 +197,31 @@ Example improvement:
 - Before: Owner not connected to "Status Tracking"
 - After: `owner --> status_tracking` ✅
 
+### System Prompt Refinement (Upstream Fix)
+
+Updated `SYSTEM_PROMPT_EXTRACTOR` in `src/analyst/prompts.ts` to improve RequirementsSummary quality upstream:
+
+**Key improvements:**
+1. **Explicit module naming in actor descriptions** - Actors now explicitly mention which modules they use
+2. **Detailed module guidance** - Special instructions for each module type (Dashboard, Status Tracking, Integration modules, etc.)
+3. **Integration vs user-facing distinction** - Integration modules described as backend/system-level to prevent spurious Owner → Integration edges
+4. **Client role clarification** - Clear guidance that clients don't use internal modules unless explicit client portal exists
+5. **Tool connection specificity** - Only connect tools where they truly integrate, not randomly everywhere
+
+**Specific examples added:**
+- Workflow Visualization Dashboard → explicitly for Owner/Wife management use
+- Status Tracking → both management and consultants, with clear use cases
+- Integration with Time Tracking Tools → backend system integration, not user-facing
+- Currency Management → Owner-specific with tool connections (Payoneer, bank account)
+- Client Portal → distinct from internal modules
+
+This upstream fix ensures the extractor produces actor/module descriptions that make relationships obvious to the keyword-based scorer, eliminating issues like:
+- ❌ Orphaned workflow dashboard (now explicitly mentions Owner/Wife as users)
+- ❌ Owner connected to integration modules (now described as backend-only)
+- ❌ Weak tool-module connections (now explicit about which tools integrate where)
+
 ---
 
-**Status**: ✅ Implementation Complete, Tested, Polished, and Business-Logic Refined
+**Status**: ✅ Implementation Complete, Tested, Polished, Business-Logic Refined, and Prompt-Enhanced
 **Date**: November 9, 2025
 
