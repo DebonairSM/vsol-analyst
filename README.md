@@ -10,11 +10,17 @@ Meet Sunny, your friendly systems analyst agent who helps gather and document bu
 - Per-user project management
 - Admin dashboard to monitor all client sessions
 - Interactive chat with customers to understand their workflows
-- Excel spreadsheet upload and analysis
+- File upload and analysis:
+  - Excel spreadsheet analysis (structure, headers, data patterns)
+  - Image/screenshot analysis with AI vision
+  - Automatic data entity extraction from spreadsheets
 - Automatic extraction of structured requirements from conversations
 - Generate requirements documents in Markdown format
+- Generate user stories from requirements
 - Generate workflow diagrams in Mermaid format
+- Text polishing with AI
 - Persistent chat history per project
+- Attachment storage and retrieval
 
 ## Setup
 
@@ -114,15 +120,18 @@ You'll now see an "ADMIN" badge in the header and an "Admin Dashboard" button on
 2. Sign in with your Google account
 3. Create a new project or select an existing one
 4. Start chatting with Sunny about your business
-5. Upload Excel spreadsheets (.xls, .xlsx) to share data with Sunny
-   - The system automatically analyzes each sheet (rows, columns, headers, sample data)
-   - This analysis is preserved in the conversation history
-6. When ready, click "Extract Requirements" to generate structured output
-   - All uploaded spreadsheet analysis is automatically included
-   - Requirements document shows a dedicated "Uploaded Documents and Data Sources" section
-   - Each sheet's structure (columns, headers, sample data) is captured
-   - Data entities are extracted for each sheet
-7. Download the requirements.md and workflow.mmd files
+5. Upload files to share information with Sunny:
+   - **Excel spreadsheets** (.xls, .xlsx): Automatic analysis of all sheets, rows, columns, headers, and sample data
+   - **Images/Screenshots** (.png, .jpg, .gif, .webp): AI vision analysis to understand diagrams, mockups, and visual requirements
+   - All file analysis is preserved in the conversation history
+6. When ready, click "Extract Requirements" to generate structured output:
+   - Dedicated "Uploaded Documents and Data Sources" section for all files
+   - Complete spreadsheet structure documentation (sheets, columns, headers, sample data)
+   - Data entities extracted from spreadsheets with field-level details
+   - Image analysis insights incorporated into requirements
+   - Professional markdown and Mermaid workflow diagram
+7. Generate user stories from extracted requirements (optional)
+8. Download the requirements.md, user-stories.md, and workflow.mmd files
 
 **For Admins:**
 1. After setting up admin access (see Setup section), log in
@@ -158,30 +167,43 @@ The backup script:
 
 For more details on setting up scheduled backups, see [backup-setup.md](backup-setup.md).
 
+## Architecture
+
+The application uses a modular route-based architecture:
+
+- **Modular Routes**: Each functional area (auth, projects, admin, analyst, attachments) has its own route module in `src/routes/`
+- **Separation of Concerns**: Business logic is organized into specialized modules (LLM providers, requirements extraction, document generation)
+- **Middleware**: Authentication and authorization are handled through reusable middleware
+- **Type Safety**: Full TypeScript implementation with strict typing
+
 ## API Endpoints
 
-### Authentication
+### Authentication (`/auth`)
 
 - `GET /auth/google` - Initiate Google OAuth flow
 - `GET /auth/google/callback` - OAuth callback handler
 - `GET /auth/logout` - Logout current user
 - `GET /auth/me` - Get current user info
 
-### Projects
+### Projects (`/api/projects`)
 
 - `GET /api/projects` - List user's projects
 - `POST /api/projects` - Create new project (requires `{ name: string }`)
 - `GET /api/projects/:id` - Get project details
 - `PATCH /api/projects/:id` - Update project (requires `{ name: string }`)
 
-### Admin (requires admin role)
+### Attachments (`/api/attachments`)
+
+- `GET /api/attachments/:id` - Serve uploaded file (images, spreadsheets)
+
+### Admin (`/api/admin`) - requires admin role
 
 - `GET /api/admin/stats` - Get system statistics (user count, project count, session count)
 - `GET /api/admin/users` - List all users with their projects
 - `GET /api/admin/projects` - List all projects from all users
 - `GET /api/admin/projects/:id/chat` - View chat history for any project
 
-### Chat & Analysis
+### Chat & Analysis (`/analyst`)
 
 #### POST /analyst/upload-excel
 
@@ -201,7 +223,29 @@ Upload and analyze an Excel spreadsheet for a project.
     "Sheet1": [[...], [...]],
     "Sheet2": [[...], [...]]
   },
-  "summary": "📊 Excel File: data.xlsx\nNumber of sheets: 2..."
+  "summary": "📊 Excel File: data.xlsx\nNumber of sheets: 2...",
+  "attachmentId": "attachment-id",
+  "storedPath": "uploads/spreadsheets/..."
+}
+```
+
+#### POST /analyst/upload-image
+
+Upload and analyze an image or screenshot for a project.
+
+**Request:**
+- Content-Type: `multipart/form-data`
+- Body:
+  - `file`: Image file (PNG, JPG, GIF, WebP, max 10MB)
+  - `projectId`: Project ID
+
+**Response:**
+```json
+{
+  "filename": "screenshot.png",
+  "attachmentId": "attachment-id",
+  "storedPath": "uploads/images/...",
+  "analysis": "AI analysis of the image..."
 }
 ```
 
@@ -248,14 +292,72 @@ Extract structured requirements from the project's conversation history.
 }
 ```
 
+#### POST /analyst/generate-stories
+
+Generate user stories from a project's chat history.
+
+**Request:**
+```json
+{
+  "projectId": "project-id"
+}
+```
+
+**Response:**
+```json
+{
+  "userStories": [ ... ],
+  "markdown": "# User Stories\n..."
+}
+```
+
+#### POST /analyst/generate-stories-from-requirements
+
+Generate user stories from cached requirements (optimized).
+
+**Request:**
+```json
+{
+  "requirements": { ... }
+}
+```
+
+**Response:**
+```json
+{
+  "userStories": [ ... ],
+  "markdown": "# User Stories\n..."
+}
+```
+
+#### POST /analyst/polish
+
+Polish and improve text using AI.
+
+**Request:**
+```json
+{
+  "text": "raw text to polish"
+}
+```
+
+**Response:**
+```json
+{
+  "original": "raw text to polish",
+  "polished": "Improved and polished text..."
+}
+```
+
 ## Technology
 
-- **LLM:** OpenAI GPT-3.5-turbo (upgradeable to GPT-4)
+- **LLM:** OpenAI GPT-4 with vision support
 - **Runtime:** Node.js with TypeScript
-- **Framework:** Express
+- **Framework:** Express with modular routing
 - **Database:** SQLite with Prisma ORM (easily upgradeable to PostgreSQL)
 - **Authentication:** Passport.js with Google OAuth 2.0
 - **Session Management:** express-session
+- **File Processing:** Multer for uploads, xlsx for spreadsheet analysis
 
 ## Project Structure
 
@@ -263,13 +365,21 @@ Extract structured requirements from the project's conversation history.
 vsol-analyst/
 ├── src/
 │   ├── auth/                    # Authentication (Passport, middleware)
+│   ├── routes/                  # API route modules
+│   │   ├── auth.ts              # Authentication routes
+│   │   ├── projects.ts          # Project management routes
+│   │   ├── attachments.ts       # File attachment routes
+│   │   ├── admin.ts             # Admin dashboard routes
+│   │   └── analyst.ts           # Chat and analysis routes
 │   ├── llm/                     # LLM provider abstraction
 │   ├── analyst/                 # Core analyst logic
+│   ├── backup/                  # Database backup utilities
 │   └── server.ts                # Express server
 ├── prisma/
 │   ├── schema.prisma            # Database schema
 │   └── migrations/              # Database migrations
 ├── public/                      # Web UI (HTML, CSS, JS)
+├── uploads/                     # File uploads (images, spreadsheets)
 ├── dev.db                       # SQLite database (gitignored)
 ├── .env                         # Environment variables (gitignored)
 └── package.json
@@ -285,6 +395,11 @@ vsol-analyst/
   - Each project has its own chat sessions
 - **ChatSession**: Stores conversation history as JSON
   - Linked to a specific project
+  - Contains all messages and file analysis
+- **Attachment**: Stores uploaded files
+  - Linked to a specific chat session
+  - Supports spreadsheets and images
+  - Tracks file type, path, and metadata
 
 ## User Roles
 
@@ -364,6 +479,27 @@ Google OAuth blocks authentication from private IP addresses in development. Alw
 - Verify your OPENAI_API_KEY is valid at https://platform.openai.com/api-keys
 - Check that you have available credits in your OpenAI account
 
+## Tips for Best Results
+
+### Working with Spreadsheets
+- Upload spreadsheets early in the conversation for context
+- Use descriptive sheet names (they appear in requirements documentation)
+- Include headers in row 1 of each sheet for accurate field identification
+- Discuss the spreadsheet data with Sunny to provide context about field meanings
+- Multiple spreadsheets can be uploaded per project
+
+### Working with Images
+- Upload screenshots of existing systems, mockups, or diagrams
+- The AI will analyze and describe what it sees
+- Images help Sunny understand visual requirements and workflows
+- Clear, high-contrast images work best
+
+### Extracting Requirements
+- Have a thorough conversation before extracting requirements
+- Discuss pain points, goals, users, and workflows
+- Upload relevant files during the conversation
+- All context is preserved and included in the extraction
+
 ## Future Enhancements
 
 - Multiple companies per user
@@ -373,3 +509,4 @@ Google OAuth blocks authentication from private IP addresses in development. Alw
 - Integration with VSol Admin app
 - Analytics dashboard
 - Billing per seat
+- Additional file types (Word, PDF documents)

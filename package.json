@@ -7,7 +7,9 @@
     "dev": "tsx src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "backup": "tsx src/backup/database-backup.ts"
+    "backup": "tsx src/backup/database-backup.ts",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "keywords": [
     "systems-analyst",
@@ -24,7 +26,6 @@
     "@types/multer": "^2.0.0",
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",
-    "body-parser": "^1.20.2",
     "dotenv": "^16.4.5",
     "express": "^4.18.2",
     "express-session": "^1.18.2",
@@ -36,9 +37,11 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@types/body-parser": "^1.19.5",
     "@types/express": "^4.17.21",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.11.19",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
     "tsx": "^4.7.1",
     "typescript": "^5.3.3"
   }
