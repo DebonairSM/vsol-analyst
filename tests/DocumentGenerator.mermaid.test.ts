@@ -232,5 +232,64 @@ describe("DocumentGenerator.generateMermaidFlow", () => {
       expect(edges.size).toBe(4);
     });
   });
+
+  describe("Real-World Consulting Scenario", () => {
+    it("should handle client roles correctly without spurious fallbacks", () => {
+      const req: RequirementsSummary = {
+        businessContext: {},
+        primaryGoal: "Manage consultant invoices for Omnigo",
+        secondaryGoals: [],
+        currentTools: ["Spreadsheet", "Payoneer"],
+        mainActors: [
+          { name: "Client (Omnigo)", description: "External client" },
+          { name: "Consultants", description: "Freelancers submitting invoices" },
+          { name: "Owner", description: "Company owner managing finances" },
+          { name: "Wife of Owner", description: "Co-manages financial operations" }
+        ],
+        painPoints: [
+          { description: "Consultants need invoice submission portal", impact: "high", frequency: "often" },
+          { description: "Owner needs visibility into payment status", impact: "high", frequency: "often" }
+        ],
+        dataEntities: [],
+        candidateModules: [
+          { name: "Invoice Submission Portal", description: "Portal for consultants to submit invoices", priority: "must-have" },
+          { name: "Automated Reminders", description: "Reminder system for deadlines", priority: "should-have" },
+          { name: "Reporting and Analytics", description: "Dashboard for owner to view reports and analytics", priority: "must-have" },
+          { name: "Status Tracking", description: "Track invoice and payment status for management", priority: "must-have" }
+        ],
+        nonFunctionalNeeds: [],
+        risksAndConstraints: [],
+        openQuestions: [],
+        uploadedDocuments: []
+      };
+
+      const generator = new DocumentGenerator();
+      const output = generator.generateMermaidFlow(req);
+      const edges = parseEdges(output);
+
+      const usedIds = new Set<string>();
+      const clientId = makeExpectedId("Client (Omnigo)", usedIds);
+      const consultantsId = makeExpectedId("Consultants", usedIds);
+      const ownerId = makeExpectedId("Owner", usedIds);
+      const wifeId = makeExpectedId("Wife of Owner", usedIds);
+      const invoicePortalId = makeExpectedId("Invoice Submission Portal", usedIds);
+      const reportingId = makeExpectedId("Reporting and Analytics", usedIds);
+      const statusId = makeExpectedId("Status Tracking", usedIds);
+      const remindersId = makeExpectedId("Automated Reminders", usedIds);
+
+      // Positive assertions
+      expect(edges.has(`${consultantsId} --> ${invoicePortalId}`)).toBe(true);
+      expect(edges.has(`${ownerId} --> ${reportingId}`)).toBe(true);
+      expect(edges.has(`${ownerId} --> ${statusId}`)).toBe(true);
+      expect(edges.has(`${wifeId} --> ${reportingId}`)).toBe(true);
+      expect(edges.has(`${wifeId} --> ${statusId}`)).toBe(true);
+
+      // Negative assertions - client should NOT have spurious fallback
+      expect(edges.has(`${clientId} --> ${remindersId}`)).toBe(false);
+      
+      // Verify Status Tracking node exists
+      expect(output.includes('status_tracking')).toBe(true);
+    });
+  });
 });
 

@@ -174,8 +174,31 @@ Dependencies cleaned:
 - Removed `body-parser` from dependencies
 - Removed `@types/body-parser` from devDependencies
 
+### Business Logic Refinements (Round 2)
+
+Applied targeted improvements based on real-world diagram output:
+
+1. **Skip client fallback edges** - External actors (client/customer/user) no longer get spurious fallback connections unless score ≥ 2
+2. **Management-module affinity** - Owners, managers, directors, accountants get +1 bonus for reporting/analytics/dashboard/status modules
+3. **Wife co-management recognition** - "Wife of Owner" detected and treated as management role for reporting/analytics access
+4. **Updated MAX_SCORE to 9** - Reflects new management affinity weight: desc(2) + name(2) + pain(2) + goals(1) + priority(1) + mgmt(1)
+5. **Added real-world test** - Comprehensive test covering client roles, management affinity, and status tracking modules
+
+New constants added:
+- `MANAGEMENT_ROLES` = ["owner", "manager", "director", "accountant"]
+- `MANAGEMENT_MODULE_KEYWORDS` = ["report", "analytics", "dashboard", "status"]
+- `CLIENT_ROLES` = ["client", "customer", "user"]
+
+All refinements maintain backward compatibility. Test coverage: 6/6 tests passing.
+
+Example improvement:
+- Before: `client_omnigo --> automated_reminders   %% fallback` ❌
+- After: Client has no edges (correct behavior) ✅
+- Before: Owner not connected to "Status Tracking"
+- After: `owner --> status_tracking` ✅
+
 ---
 
-**Status**: ✅ Implementation Complete, Tested, and Polished
+**Status**: ✅ Implementation Complete, Tested, Polished, and Business-Logic Refined
 **Date**: November 9, 2025
 

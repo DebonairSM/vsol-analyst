@@ -36,7 +36,11 @@ const STOPWORDS = new Set([
 ]);
 
 const DEFAULT_SCORE_THRESHOLD = 2;
-const MAX_SCORE = 8; // Current max: desc(2) + name(2) + pain(2) + goals(1) + priority(1) = 8
+const MAX_SCORE = 9; // Current max: desc(2) + name(2) + pain(2) + goals(1) + priority(1) + mgmt-affinity(1) = 9
+
+const MANAGEMENT_ROLES = ["owner", "manager", "director", "accountant"];
+const MANAGEMENT_MODULE_KEYWORDS = ["report", "analytics", "dashboard", "status"];
+const CLIENT_ROLES = ["client", "customer", "user"];
 
 export class DocumentGenerator {
   constructor(
@@ -326,6 +330,23 @@ export class DocumentGenerator {
       score += 1;
     }
 
+    // 6. Management-module affinity (0-1 point)
+    // Owners, managers, directors, accountants prefer reporting/analytics/dashboards
+    const actorLower = actor.name.toLowerCase();
+    const hasManagementRole = MANAGEMENT_ROLES.some(role => actorKeywords.includes(role));
+    const hasWifeRelation = actorLower.includes("wife") && 
+      (req.mainActors || []).some(a => a.name.toLowerCase().includes("owner"));
+
+    if (hasManagementRole || hasWifeRelation) {
+      const moduleNameLower = module.name.toLowerCase();
+      const isManagementModule = MANAGEMENT_MODULE_KEYWORDS.some(kw => 
+        moduleNameLower.includes(kw)
+      );
+      if (isManagementModule) {
+        score += 1;
+      }
+    }
+
     // Guard against runaway scores
     return Math.min(score, MAX_SCORE);
   }
@@ -336,6 +357,11 @@ export class DocumentGenerator {
     modules: CandidateModule[],
     scoresForActor: Map<string, number>
   ): { module: CandidateModule; score: number } | null {
+    // Check if this is a client/external actor - skip fallback for them
+    const actorLower = actor.name.toLowerCase();
+    const actorWords = actorLower.split(/\s+/);
+    const isClientRole = CLIENT_ROLES.some(role => actorWords.includes(role));
+    
     let best: CandidateModule | null = null;
     let bestScore = 0;
 
@@ -346,6 +372,11 @@ export class DocumentGenerator {
         bestScore = score;
         best = mod;
       }
+    }
+
+    // Skip fallback for client/external actors unless they have a meaningful score
+    if (isClientRole && bestScore < 2) {
+      return null;
     }
 
     // If no positive score, search by central name patterns
