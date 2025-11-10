@@ -6,6 +6,20 @@ let isInitialLoad = true;
 let recognition = null;
 let isRecording = false;
 let cachedRequirements = null; // Store extracted requirements to avoid re-extraction
+let progressInterval = null; // Track progress update intervals
+let tipsInterval = null; // Track tips rotation intervals
+let progressBarInterval = null; // Track progress bar animation
+
+// Educational tips to rotate during loading
+const educationalTips = [
+    "Requirements documents help ensure everyone understands the project scope",
+    "Workflow diagrams make it easier to visualize how your system will operate",
+    "User stories break down features into manageable development tasks",
+    "Upload Excel spreadsheets to generate seed data for quick project setup",
+    "Well-defined requirements reduce development time and costs",
+    "Clear documentation helps teams stay aligned throughout the project",
+    "Visual workflows help identify bottlenecks before development begins"
+];
 
 // DOM Elements
 const loginPage = document.getElementById('login-page');
@@ -568,6 +582,18 @@ function showOutputModal() {
     const loadingDiv = document.getElementById('extraction-loading');
     const resultsDiv = document.getElementById('extraction-results');
     
+    // Reset status and tip text to initial values
+    const statusElement = document.getElementById('extraction-status');
+    const tipElement = document.getElementById('extraction-tip');
+    if (statusElement) statusElement.textContent = "Sunny is reviewing your conversation...";
+    if (tipElement) tipElement.textContent = educationalTips[0];
+    
+    // Reset progress bar
+    const progressBar = document.getElementById('extraction-progress-bar');
+    const percentageDisplay = document.getElementById('extraction-percentage');
+    if (progressBar) progressBar.style.width = '0%';
+    if (percentageDisplay) percentageDisplay.textContent = '0%';
+    
     // Show loading state
     loadingDiv.style.display = 'block';
     resultsDiv.style.display = 'none';
@@ -583,9 +609,108 @@ function showOutputResults() {
     resultsDiv.style.display = 'block';
 }
 
+// Helper function to clear all loading intervals
+function clearLoadingIntervals() {
+    if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+    }
+    if (tipsInterval) {
+        clearInterval(tipsInterval);
+        tipsInterval = null;
+    }
+    if (progressBarInterval) {
+        clearInterval(progressBarInterval);
+        progressBarInterval = null;
+    }
+}
+
+// Animate progress bar from 0 to 100% over estimated duration
+function animateProgressBar(barId, percentageId, estimatedDuration) {
+    const progressBar = document.getElementById(barId);
+    const percentageDisplay = document.getElementById(percentageId);
+    if (!progressBar || !percentageDisplay) return;
+    
+    let currentProgress = 0;
+    const startTime = Date.now();
+    
+    // Update every 100ms for smooth animation
+    progressBarInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        // Calculate progress (reaches 95% at estimated duration, holds there until complete)
+        currentProgress = Math.min(95, (elapsed / estimatedDuration) * 100);
+        
+        progressBar.style.width = currentProgress + '%';
+        percentageDisplay.textContent = Math.floor(currentProgress) + '%';
+    }, 100);
+}
+
+// Complete the progress bar animation to 100%
+function completeProgressBar(barId, percentageId) {
+    const progressBar = document.getElementById(barId);
+    const percentageDisplay = document.getElementById(percentageId);
+    if (progressBar && percentageDisplay) {
+        progressBar.style.width = '100%';
+        percentageDisplay.textContent = '100%';
+    }
+}
+
+// Start rotating educational tips
+function startTipsRotation(tipElementId) {
+    const tipElement = document.getElementById(tipElementId);
+    if (!tipElement) return;
+    
+    let currentTipIndex = 0;
+    
+    // Rotate tips every 4.5 seconds
+    tipsInterval = setInterval(() => {
+        currentTipIndex = (currentTipIndex + 1) % educationalTips.length;
+        tipElement.textContent = educationalTips[currentTipIndex];
+    }, 4500);
+}
+
+// Update extraction progress through stages
+function startExtractionProgress() {
+    const statusElement = document.getElementById('extraction-status');
+    if (!statusElement) return;
+    
+    let stage = 0;
+    const stages = [
+        "Sunny is reviewing your conversation...",
+        "Sunny is identifying key requirements...",
+        "Sunny is mapping out your workflows..."
+    ];
+    
+    // Update progress every 3 seconds
+    progressInterval = setInterval(() => {
+        stage = (stage + 1) % stages.length;
+        statusElement.textContent = stages[stage];
+    }, 3000);
+}
+
+// Update user stories generation progress through stages
+function startStoriesProgress() {
+    const statusElement = document.getElementById('stories-status');
+    if (!statusElement) return;
+    
+    let stage = 0;
+    const stages = [
+        "Sunny is analyzing your requirements...",
+        "Sunny is crafting user stories...",
+        "Sunny is organizing documentation..."
+    ];
+    
+    // Update progress every 3 seconds
+    progressInterval = setInterval(() => {
+        stage = (stage + 1) % stages.length;
+        statusElement.textContent = stages[stage];
+    }, 3000);
+}
+
 function hideOutputModal() {
     const modal = document.getElementById('output-modal');
     modal.classList.remove('visible');
+    clearLoadingIntervals();
 }
 
 async function extractRequirements() {
@@ -607,6 +732,13 @@ async function performExtraction() {
     // Show modal with loading animation
     showOutputModal();
     
+    // Start dynamic progress updates and tips rotation
+    startExtractionProgress();
+    startTipsRotation('extraction-tip');
+    
+    // Start progress bar animation (estimated 15 seconds for extraction)
+    animateProgressBar('extraction-progress-bar', 'extraction-percentage', 15000);
+    
     try {
         const response = await fetch('/analyst/extract', {
             method: 'POST',
@@ -616,6 +748,7 @@ async function performExtraction() {
         
         if (!response.ok) {
             if (response.status === 401) {
+                clearLoadingIntervals();
                 hideOutputModal();
                 alert('Session expired. Please login again.');
                 showLogin();
@@ -632,9 +765,19 @@ async function performExtraction() {
         markdownOutput.value = data.markdown;
         mermaidOutput.value = data.mermaid;
         
+        // Complete progress bar to 100%
+        completeProgressBar('extraction-progress-bar', 'extraction-percentage');
+        
+        // Brief pause to show 100% before transitioning
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Clear intervals before showing results
+        clearLoadingIntervals();
+        
         // Switch modal to show results
         showOutputResults();
     } catch (error) {
+        clearLoadingIntervals();
         hideOutputModal();
         addMessage('assistant', 'Sorry, I could not extract requirements. Please continue the conversation.');
         console.error('Error:', error);
@@ -711,10 +854,29 @@ async function generateUserStories() {
     const storiesOutput = document.getElementById('stories-output');
     const userStoriesTextarea = document.getElementById('user-stories-output');
     
+    // Reset status and tip text to initial values
+    const statusElement = document.getElementById('stories-status');
+    const tipElement = document.getElementById('stories-tip');
+    if (statusElement) statusElement.textContent = "Sunny is analyzing your requirements...";
+    if (tipElement) tipElement.textContent = educationalTips[2]; // Use user stories tip
+    
+    // Reset progress bar
+    const progressBar = document.getElementById('stories-progress-bar');
+    const percentageDisplay = document.getElementById('stories-percentage');
+    if (progressBar) progressBar.style.width = '0%';
+    if (percentageDisplay) percentageDisplay.textContent = '0%';
+    
     // Hide button and show loading
     generateBtn.style.display = 'none';
     storiesLoading.style.display = 'block';
     storiesOutput.style.display = 'none';
+    
+    // Start dynamic progress updates and tips rotation
+    startStoriesProgress();
+    startTipsRotation('stories-tip');
+    
+    // Start progress bar animation (estimated 12 seconds for user stories)
+    animateProgressBar('stories-progress-bar', 'stories-percentage', 12000);
     
     try {
         // Use cached requirements if available (faster, no LLM call to re-extract)
@@ -743,12 +905,22 @@ async function generateUserStories() {
         // Store the markdown for download
         userStoriesTextarea.value = data.markdown;
         
+        // Complete progress bar to 100%
+        completeProgressBar('stories-progress-bar', 'stories-percentage');
+        
+        // Brief pause to show 100% before transitioning
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Clear intervals before showing results
+        clearLoadingIntervals();
+        
         // Hide loading and show output
         storiesLoading.style.display = 'none';
         storiesOutput.style.display = 'block';
         
     } catch (error) {
         console.error('Error generating user stories:', error);
+        clearLoadingIntervals();
         alert('Failed to generate user stories. Please try again.');
         
         // Show button again on error
@@ -1582,11 +1754,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 selectedSpreadsheetData = data;
                 
-                // Generate preview
+                // Generate preview - show ALL rows for seed data generation
                 let preview = `Filename: ${data.filename}\n`;
                 preview += `Sheets: ${Object.keys(data.parsedData || {}).length}\n\n`;
                 
-                // Show first few rows of each sheet
+                // Show all rows of each sheet
                 if (data.parsedData) {
                     Object.keys(data.parsedData).forEach(sheetName => {
                         const sheetData = data.parsedData[sheetName];
@@ -1594,8 +1766,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         preview += `Rows: ${sheetData.length}\n`;
                         
                         if (sheetData.length > 0) {
-                            preview += `\nFirst 3 rows:\n`;
-                            sheetData.slice(0, 3).forEach((row, idx) => {
+                            preview += `\nAll rows:\n`;
+                            sheetData.forEach((row, idx) => {
                                 preview += `${idx + 1}: ${JSON.stringify(row)}\n`;
                             });
                         }

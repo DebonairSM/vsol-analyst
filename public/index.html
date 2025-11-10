@@ -887,6 +887,40 @@
             }
         }
 
+        /* Progress Bar Styles */
+        .progress-container {
+            width: 100%;
+            max-width: 400px;
+            margin: 1.5rem auto 0;
+            padding: 0 1rem;
+        }
+
+        .progress-bar-wrapper {
+            width: 100%;
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2563eb 0%, #3b82f6 50%, #60a5fa 100%);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+            width: 0%;
+            box-shadow: 0 0 10px rgba(37, 99, 235, 0.3);
+        }
+
+        .progress-percentage {
+            text-align: center;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            color: #2563eb;
+            font-weight: 600;
+        }
+
         .modal-content h3 {
             margin-bottom: 1rem;
             color: #111827;
@@ -1720,8 +1754,14 @@
         <div class="modal-content output-modal-content">
             <div id="extraction-loading" style="display: none; text-align: center; padding: 2rem;">
                 <img src="/assets/sunny-face.png" alt="Sunny" class="extraction-loading-avatar" width="120" height="120" loading="eager" style="width:120px;height:120px;min-width:120px;min-height:120px;max-width:120px;max-height:120px;display:block;object-fit:contain;aspect-ratio:1/1;margin:0 auto;">
-                <h3 style="margin-top: 1.5rem; color: #111827;">Sunny is analyzing your conversation...</h3>
-                <p style="color: #6b7280; margin-top: 0.5rem;">Extracting requirements and generating documentation</p>
+                <h3 id="extraction-status" style="margin-top: 1.5rem; color: #111827;">Sunny is reviewing your conversation...</h3>
+                <div class="progress-container">
+                    <div class="progress-bar-wrapper">
+                        <div id="extraction-progress-bar" class="progress-bar-fill"></div>
+                    </div>
+                    <div id="extraction-percentage" class="progress-percentage">0%</div>
+                </div>
+                <p id="extraction-tip" style="color: #6b7280; margin-top: 1rem;">Requirements documents help ensure everyone understands the project scope</p>
                 <div class="loading-dots">
                     <span></span>
                     <span></span>
@@ -1756,7 +1796,14 @@
                     </button>
                     <div id="stories-loading" style="display: none; text-align: center; padding: 2rem;">
                         <img src="/assets/sunny-face.png" alt="Sunny" class="extraction-loading-avatar" width="80" height="80" style="width:80px;height:80px;margin:0 auto;">
-                        <p style="color: #6b7280; margin-top: 1rem; font-size: 0.95rem;">Generating user stories...</p>
+                        <h3 id="stories-status" style="margin-top: 1rem; color: #111827; font-size: 1.1rem;">Sunny is analyzing your requirements...</h3>
+                        <div class="progress-container">
+                            <div class="progress-bar-wrapper">
+                                <div id="stories-progress-bar" class="progress-bar-fill"></div>
+                            </div>
+                            <div id="stories-percentage" class="progress-percentage">0%</div>
+                        </div>
+                        <p id="stories-tip" style="color: #6b7280; margin-top: 1rem; font-size: 0.95rem;">User stories break down features into manageable development tasks</p>
                         <div class="loading-dots">
                             <span></span>
                             <span></span>

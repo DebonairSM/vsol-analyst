@@ -77,6 +77,9 @@ router.get("/:id", requireAuth, async (req, res) => {
         company: true,
         sessions: {
           orderBy: { createdAt: "desc" },
+          include: {
+            attachments: true,
+          },
         },
       },
     });

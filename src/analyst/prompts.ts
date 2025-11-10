@@ -44,6 +44,13 @@ INTEGRATIONS:
 - Suggest API integrations with their existing tools (payment processors, time tracking, accounting software, etc.).
 - Understanding their current ecosystem helps VSol build software that fits seamlessly into their workflow.
 
+When ${userName} describes their process:
+- Reflect their own phrasing back (e.g., "invoice portal", "status dashboard", "payment report").
+- Ask light clarifying questions that surface potential modules, such as:
+  - "Is that more like a dashboard, a portal, or a report?"
+  - "Who usually uses that screen – you, your team, or your clients?"
+This helps later stages define clear modules and actor-module relationships.
+
 Do NOT talk about APIs, databases, or architecture unless the customer explicitly asks.
 Focus on their business reality, not technology choices.
 `;
@@ -190,41 +197,81 @@ List external tools, services, or systems currently in use:
 
 ### 4. Workflow Diagram (workflowDiagram)
 
-Generate a Mermaid flowchart TD showing the relationships between:
+Generate a Mermaid \`flowchart TD\` showing the relationships between:
 - Actors (user roles)
 - Modules (system features)
 - Tools (external systems)
 
-**Format Requirements:**
-- Use flowchart TD syntax
-- Create readable node IDs from names (lowercase, underscores)
-- Use square brackets for node labels: node_id["Node Label"]
-- Draw edges showing who uses what: actor --> module
-- Draw tool integrations: tool --> module (only where there's actual integration)
-
-**Connection Rules:**
-- Connect actors to the modules they interact with
-- Connect tools to modules that integrate with them
-- Internal users (Owner, Manager) → dashboards, reporting, management modules
-- External users (Client, Customer) → client-facing portals only
-- System integrations (Time Tracking) → integration modules, NOT to users
-- Don't connect everyone to everything - be selective and accurate
-
-**Example:**
-
-flowchart TD
-  owner["Owner"]
-  consultant["Consultant"]
-  invoice_portal["Invoice Submission Portal"]
-  reporting["Reporting and Analytics"]
-  time_doctor["Time Doctor"]
-  
-  consultant --> invoice_portal
-  owner --> reporting
-  owner --> invoice_portal
-  time_doctor --> invoice_portal
-
 The workflowDiagram field should contain ONLY the Mermaid syntax (no markdown fences).
+
+**Format Requirements:**
+- Start with: \`flowchart TD\`
+- Use lowercase IDs with underscores:
+  - Spaces → underscores
+  - Remove non-alphanumeric characters (except underscores)
+- Node syntax: \`node_id["Node Label"]\`
+- Example:
+  - \`owner["Owner"]\`
+  - \`consultants["Consultants"]\`
+  - \`client_omnigo["Client (Omnigo)"]\`
+  - \`invoice_submission_portal["Invoice Submission Portal"]\`
+
+**What becomes a node:**
+- All actors from mainActors
+- All modules from candidateModules
+- All tools from currentTools that are clearly part of the invoicing/payment workflow
+
+**Edges – WHEN to connect:**
+
+Use \`-->\` arrows.
+
+- Actor → Module (\`actor --> module\`) when:
+  - The module description explicitly says that actor uses it, OR
+  - The actor description mentions that functionality, AND the module name/description clearly matches it.
+
+  Examples:
+  - If "Consultants submit invoices through a portal" and there is \`Invoice Submission Portal\`:
+    - \`consultants --> invoice_submission_portal\`
+  - If "Consultants track their payments / see status" and there is \`Status Tracking\`:
+    - \`consultants --> status_tracking\`
+  - If "Owner views dashboards / visualizes workflow" and there is \`Workflow Visualization Dashboard\`:
+    - \`owner --> workflow_visualization_dashboard\`
+  - If "Owner generates reports / analyzes trends" and there is \`Reporting and Analytics\`:
+    - \`owner --> reporting_and_analytics\`
+
+- Client (Omnigo):
+  - Connect to client-facing modules only, such as:
+    - \`client_omnigo --> client_portal_for_invoice_viewing\`
+  - Or, if no client portal exists, a simple:
+    - \`client_omnigo --> owner\`
+  - Do NOT connect the client to internal management modules (status tracking, dashboards, currency management, integration modules) unless the requirements text clearly describe a client-facing view of those.
+
+- Tools → Modules (\`tool --> module\`) when there is explicit or strong implied integration:
+  - If a module integrates with Time Doctor to import hours:
+    - \`time_doctor --> integration_with_time_tracking_tools\`
+    - or \`time_doctor --> reporting_and_analytics\` if reports use Time Doctor data
+  - If a module processes payments via Payoneer:
+    - \`payoneer --> payment_management\`
+    - or \`payoneer --> reporting_and_analytics\` when reports include Payoneer payment data
+  - If documents are stored in OneDrive:
+    - \`onedrive --> document_management\`
+
+**Edges – WHEN NOT to connect:**
+
+- Do NOT connect every actor to every module.
+- Do NOT connect clients to internal back-office modules unless explicitly described.
+- Do NOT connect owners/managers directly to pure integration modules (like "Integration with Time Tracking Tools") unless the text explicitly says they operate that module.
+- It is acceptable for some nodes to have no edges if the transcript does not justify a relationship. Do NOT invent edges just to avoid orphans.
+
+**Direction conventions:**
+- \`actor --> module\` for "actor uses module"
+- \`tool --> module\` for "tool feeds data into / integrates with module"
+- Use \`module --> actor\` only when the module clearly sends outputs (notifications, reports) to that actor and the direction is explicit in the requirements.
+
+The \`workflowDiagram\` string should include:
+- Node declarations (actors, modules, tools)
+- Edge declarations following the rules above
+- No markdown fences, no comments, just Mermaid syntax.
 
 ---
 
@@ -307,13 +354,14 @@ The workflowDiagram field should contain ONLY the Mermaid syntax (no markdown fe
    - If YES, you MUST have at least 1 entry in uploadedDocuments array
    - If you have 0 uploadedDocuments but files were uploaded, GO BACK and extract them
    - Verify the workflowDiagram field contains valid Mermaid syntax
-   - Ensure you've captured at least:
-     * 3+ mainActors
-     * 1+ dataEntities (if any data was discussed or uploaded)
-     * 5+ candidateModules
-     * 3+ painPoints
-     * currentTools list (if they mentioned any)
-     * workflowDiagram with nodes and edges
+   - If the business context is reasonably rich, aim to capture:
+     * Multiple mainActors (all that are clearly implied)
+     * All meaningful dataEntities that are discussed or visible in uploaded files
+     * All distinct candidateModules that the conversation implies
+     * All clear painPoints mentioned
+     * A currentTools list if any tools are mentioned
+     * A workflowDiagram with nodes and edges
+   - If the conversation is very short or simple, prefer being faithful to the transcript over forcing a minimum count.
 
 9. CRITICAL: If the transcript contains "[SYSTEM: User uploaded" and your uploadedDocuments array is empty, 
    you have made an ERROR. Fix it before returning.
@@ -506,6 +554,8 @@ Align stories with:
 
 ### Constraints
 
+- Use actor names exactly as they appear in RequirementsSummary.mainActors.
+- Use module names exactly (or very close) to RequirementsSummary.candidateModules.name when referencing functionality.
 - Do not invent actors or modules that are not present in RequirementsSummary.
 - Prefer fewer, meaningful stories over many repetitive ones.
 - Maintain clear links between:
@@ -543,6 +593,9 @@ Your job is to fix issues in the RequirementsSummary, particularly the workflowD
 - External users (Client, Customer) should only connect to client-facing portals
 
 **Constraints:**
+- Do NOT change businessContext, mainActors, dataEntities, candidateModules, or other fields unless the transcript clearly shows they are wrong.
+- Prefer to fix problems by editing ONLY the workflowDiagram field.
+- Do NOT invent new actors, modules, or tools that are not present in the existing RequirementsSummary.
 - Do NOT change the overall structure or invent new actors/modules
 - Keep all changes faithful to the transcript
 - Be conservative - only fix clear issues
@@ -578,6 +631,7 @@ Your job is to refine the UserStoriesOutput to address quality issues:
 
 **Important Constraints**:
 
+- Do NOT introduce new modules or tools in stories that are not present in RequirementsSummary.
 - Do NOT change the overall structure or add epics that aren't implied by requirements
 - Keep story IDs in the same format (US-XXX)
 - Maintain priority levels (must-have, should-have, nice-to-have) unless clearly misaligned

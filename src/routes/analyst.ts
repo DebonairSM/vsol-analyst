@@ -28,6 +28,24 @@ const refinementPipeline = new RequirementsRefinementPipeline(
   extractor,
   docs
 );
+
+// Helper function to convert undefined values to null for JSON storage (Prisma requirement)
+const convertUndefinedToNull = (obj: any): any => {
+  if (obj === undefined) {
+    return null;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(convertUndefinedToNull);
+  }
+  if (obj !== null && typeof obj === 'object') {
+    const converted: any = {};
+    for (const key in obj) {
+      converted[key] = convertUndefinedToNull(obj[key]);
+    }
+    return converted;
+  }
+  return obj;
+};
 const storyRefinementPipeline = new UserStoryRefinementPipeline(
   llmMini,
   llmFull,
@@ -166,10 +184,10 @@ router.post("/chat", requireAuth, async (req, res) => {
     // Add assistant reply
     history.push({ role: "assistant", content: reply });
 
-    // Update session in database
+    // Update session in database (convert undefined to null for Prisma)
     await prisma.chatSession.update({
       where: { id: chatSession.id },
-      data: { history: JSON.stringify(history) },
+      data: { history: JSON.stringify(convertUndefinedToNull(history)) },
     });
 
     res.json({ reply });
@@ -449,26 +467,6 @@ router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), asyn
 
     result.summary = summaryParts.join("\n");
 
-    // Convert undefined values to null for JSON storage (Prisma requirement)
-    const convertUndefinedToNull = (obj: any): any => {
-      if (obj === undefined) {
-        return null;
-      }
-      if (Array.isArray(obj)) {
-        return obj.map(convertUndefinedToNull);
-      }
-      if (obj !== null && typeof obj === 'object') {
-        const converted: any = {};
-        for (const key in obj) {
-          converted[key] = convertUndefinedToNull(obj[key]);
-        }
-        return converted;
-      }
-      return obj;
-    };
-    
-    const cleanedSheets = convertUndefinedToNull(result.sheets);
-
     // Get or create chat session for this project
     let chatSession = await prisma.chatSession.findFirst({
       where: { projectId },
@@ -487,14 +485,19 @@ router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), asyn
       });
     }
 
-    // Create Attachment record
+    // Create Attachment record - convert undefined to null for Prisma JSON validation
+    // JSON.stringify/parse removes undefined values, but we need null instead for Prisma
+    const cleanedParsedData = JSON.parse(
+      JSON.stringify(result.sheets, (key, value) => value === undefined ? null : value)
+    );
+    
     const attachment = await prisma.attachment.create({
       data: {
         filename: req.file.originalname,
         storedPath: req.file.path,
         fileType: "spreadsheet",
         mimeType: req.file.mimetype,
-        parsedData: cleanedSheets,
+        parsedData: cleanedParsedData,
         sessionId: chatSession.id,
       },
     });
@@ -531,10 +534,10 @@ router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), asyn
       content: acknowledgment,
     });
 
-    // Save the updated history
+    // Save the updated history (convert undefined to null for Prisma)
     await prisma.chatSession.update({
       where: { id: chatSession.id },
-      data: { history: JSON.stringify(history) },
+      data: { history: JSON.stringify(convertUndefinedToNull(history)) },
     });
 
     res.json({
@@ -656,13 +659,13 @@ router.post("/upload-image", requireAuth, uploadImage.single("file"), async (req
 
     // Create Attachment record
     const attachment = await prisma.attachment.create({
-      data: {
+      data: convertUndefinedToNull({
         filename: req.file.originalname,
         storedPath: req.file.path,
         fileType: "image",
         mimeType: req.file.mimetype,
         sessionId: chatSession.id,
-      },
+      }) as any,
     });
 
     // Convert image to base64 data URL for vision analysis
@@ -713,10 +716,10 @@ router.post("/upload-image", requireAuth, uploadImage.single("file"), async (req
       content: analysis,
     });
 
-    // Save the updated history
+    // Save the updated history (convert undefined to null for Prisma)
     await prisma.chatSession.update({
       where: { id: chatSession.id },
-      data: { history: JSON.stringify(history) },
+      data: { history: JSON.stringify(convertUndefinedToNull(history)) },
     });
 
     res.json({
