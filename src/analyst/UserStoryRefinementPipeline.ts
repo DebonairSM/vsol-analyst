@@ -118,17 +118,69 @@ export class UserStoryRefinementPipeline {
     requirements: RequirementsSummary,
     onProgress?: (progress: number, stage: string) => void
   ): Promise<StoryRefinementPipelineResult> {
+    const startTime = Date.now();
     console.log("🚀 [Story Generation] Starting with gpt-4o-mini");
     
-    if (onProgress) onProgress(30, "Sunny is crafting user stories...");
+    let lastProgressTime = Date.now();
     
-    // 1) First pass with mini model
+    if (onProgress) {
+      onProgress(30, "Sunny is crafting user stories...");
+      console.log(`⏱️  [Progress] 30% at ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
+    }
+    
+    // 1) First pass with mini model (slow part - LLM work)
+    // Set up interval to show progress during generation
+    let currentStoryProgress = 30;
+    const progressMessages = [
+      "Sunny is writing user stories...",
+      "Sunny is defining acceptance criteria...",
+      "Sunny is organizing by priority...",
+      "Sunny is structuring epics...",
+      "Sunny is creating story descriptions...",
+      "Sunny is detailing requirements..."
+    ];
+    let messageIndex = 0;
+    
+    // Show progress every 4 seconds during generation (typically takes ~20-30s)
+    const progressInterval = setInterval(() => {
+      if (currentStoryProgress < 50) {
+        currentStoryProgress = Math.min(50, currentStoryProgress + 5);
+        const message = progressMessages[messageIndex % progressMessages.length];
+        if (onProgress) {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+          const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+          onProgress(currentStoryProgress, message);
+          console.log(`⏱️  [Progress] ${currentStoryProgress}% at ${elapsed}s (Δ${delta}s)`);
+          lastProgressTime = Date.now();
+        }
+        messageIndex++;
+      }
+    }, 4000); // Update every 4 seconds during story generation
+    
+    const generationStartTime = Date.now();
     const baseStories = await this.storyGen.generateFromRequirements(requirements);
+    const generationDuration = Date.now() - generationStartTime;
+    console.log(`⏱️  [Timing] Story generation took ${(generationDuration / 1000).toFixed(2)}s`);
+    
+    // Clear the progress interval
+    clearInterval(progressInterval);
 
-    if (onProgress) onProgress(55, "Sunny is analyzing story quality...");
+    if (onProgress) {
+      onProgress(55, "Sunny is analyzing story quality...");
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+      console.log(`⏱️  [Progress] 55% at ${elapsed}s (Δ${delta}s)`);
+      lastProgressTime = Date.now();
+    }
+    
+    // Add delay to let progress animation catch up
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // 2) Analyze quality
+    const qualityStartTime = Date.now();
     const metrics = this.storyGen.analyzeStoryQuality(baseStories);
+    const qualityDuration = Date.now() - qualityStartTime;
+    console.log(`⏱️  [Timing] Quality analysis took ${(qualityDuration / 1000).toFixed(2)}s`);
     console.log(`📊 [Story Quality] Score: ${metrics.totalQualityScore}/100`);
     
     if (metrics.storiesWithoutAcceptanceCriteria.length > 0) {
@@ -141,31 +193,87 @@ export class UserStoryRefinementPipeline {
       console.log(`⚠️  [Story Quality] ${metrics.storiesWithoutBenefits.length} stories missing benefits`);
     }
 
+    if (onProgress) {
+      onProgress(60, "Sunny is checking story quality...");
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+      console.log(`⏱️  [Progress] 60% at ${elapsed}s (Δ${delta}s)`);
+      lastProgressTime = Date.now();
+    }
+    
+    // Add delay to let progress animation catch up
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     // 3) Decide if refinement is needed
     let finalStories = baseStories;
     let wasRefined = false;
 
     if (this.needsRefinement(metrics)) {
       console.log("🔄 [Story Refinement] Quality issues detected, refining with gpt-4o");
-      if (onProgress) onProgress(65, "Sunny is refining story quality...");
+      if (onProgress) {
+        onProgress(65, "Sunny is refining story quality...");
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+        console.log(`⏱️  [Progress] 65% at ${elapsed}s (Δ${delta}s)`);
+        lastProgressTime = Date.now();
+      }
       
+      const refinementStartTime = Date.now();
       finalStories = await this.refineStories(requirements, baseStories, metrics);
+      const refinementDuration = Date.now() - refinementStartTime;
+      console.log(`⏱️  [Timing] Story refinement took ${(refinementDuration / 1000).toFixed(2)}s`);
       wasRefined = true;
       
-      if (onProgress) onProgress(80, "Sunny is verifying improvements...");
+      if (onProgress) {
+        onProgress(80, "Sunny is verifying improvements...");
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+        console.log(`⏱️  [Progress] 80% at ${elapsed}s (Δ${delta}s)`);
+        lastProgressTime = Date.now();
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Re-analyze to show improvement
       const refinedMetrics = this.storyGen.analyzeStoryQuality(finalStories);
       console.log(`✅ [Story Refinement] Complete. New score: ${refinedMetrics.totalQualityScore}/100`);
+      
+      if (onProgress) {
+        onProgress(85, "Sunny is organizing user stories...");
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+        console.log(`⏱️  [Progress] 85% at ${elapsed}s (Δ${delta}s)`);
+        lastProgressTime = Date.now();
+      }
+      await new Promise(resolve => setTimeout(resolve, 800));
     } else {
       console.log("✅ [Story Generation] Quality acceptable, using gpt-4o-mini result");
-      if (onProgress) onProgress(75, "Sunny is organizing user stories...");
+      if (onProgress) {
+        onProgress(75, "Sunny is organizing user stories...");
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+        console.log(`⏱️  [Progress] 75% at ${elapsed}s (Δ${delta}s)`);
+        lastProgressTime = Date.now();
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    if (onProgress) onProgress(90, "Sunny is generating documentation...");
+    if (onProgress) {
+      onProgress(90, "Sunny is generating documentation...");
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+      console.log(`⏱️  [Progress] 90% at ${elapsed}s (Δ${delta}s)`);
+      lastProgressTime = Date.now();
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // 4) Generate markdown
+    const markdownStartTime = Date.now();
     const markdown = this.markdownGenerator(finalStories);
+    const markdownDuration = Date.now() - markdownStartTime;
+    console.log(`⏱️  [Timing] Markdown generation took ${(markdownDuration / 1000).toFixed(2)}s`);
+    
+    const totalDuration = Date.now() - startTime;
+    console.log(`⏱️  [Timing] Total story pipeline took ${(totalDuration / 1000).toFixed(2)}s`);
 
     return {
       userStories: finalStories,

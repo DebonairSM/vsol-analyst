@@ -340,8 +340,13 @@ router.post("/extract-stream", requireAuth, async (req, res) => {
       
       sendProgress(95, "Sunny is finalizing documentation...");
       
+      // Send 100% progress
+      sendProgress(100, "Completing...");
+      
+      // Wait 2 seconds to let the user see 100% completing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       // Send final result
-      sendProgress(100, "Complete");
       res.write(`data: ${JSON.stringify({ 
         complete: true,
         requirements: result.requirements, 
@@ -490,8 +495,13 @@ router.post("/generate-stories-stream", requireAuth, async (req, res) => {
       
       sendProgress(95, "Sunny is finalizing user stories...");
       
+      // Send 100% progress
+      sendProgress(100, "Completing...");
+      
+      // Wait 2 seconds to let the user see 100% completing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       // Send final result
-      sendProgress(100, "Complete");
       res.write(`data: ${JSON.stringify({ 
         complete: true,
         userStories: result.userStories, 

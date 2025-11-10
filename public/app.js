@@ -623,46 +623,41 @@ function clearLoadingIntervals() {
     }
 }
 
-// Animate progress bar smoothly to target with 5% increments
+// Animate progress bar smoothly to target with 1% increments
 function animateProgressTo(barId, percentageId, target) {
-    // Clear any existing animation
-    if (progressAnimationInterval) {
-        clearInterval(progressAnimationInterval);
-        progressAnimationInterval = null;
-    }
-    
+    // Update target
     targetProgress = target;
-    
-    // Calculate how long to take (at least 2 seconds, scale with distance)
-    const distance = Math.abs(targetProgress - currentProgress);
-    const duration = Math.max(2000, distance * 100); // 100ms per percent, min 2 seconds
-    const steps = Math.ceil(distance / 5); // Number of 5% steps
-    const intervalTime = steps > 0 ? duration / steps : 100;
     
     const progressBar = document.getElementById(barId);
     const percentageDisplay = document.getElementById(percentageId);
     
     if (!progressBar || !percentageDisplay) return;
     
-    progressAnimationInterval = setInterval(() => {
-        if (currentProgress < targetProgress) {
-            // Increment by 5%, but don't overshoot
-            currentProgress = Math.min(currentProgress + 5, targetProgress);
-            
-            progressBar.style.width = currentProgress + '%';
-            percentageDisplay.textContent = currentProgress + '%';
-            
-            // If we've reached the target, clear the interval
-            if (currentProgress >= targetProgress) {
+    // If no animation is running, start one
+    if (!progressAnimationInterval) {
+        progressAnimationInterval = setInterval(() => {
+            if (currentProgress < targetProgress) {
+                // Increment by 1% smoothly
+                currentProgress = Math.min(currentProgress + 1, targetProgress);
+                
+                progressBar.style.width = currentProgress + '%';
+                percentageDisplay.textContent = currentProgress + '%';
+            }
+            // Keep running - we'll update targetProgress when backend sends new updates
+            // Only stop when we reach 100%
+            if (currentProgress >= 100) {
                 clearInterval(progressAnimationInterval);
                 progressAnimationInterval = null;
             }
-        } else {
-            // Already at or past target
-            clearInterval(progressAnimationInterval);
-            progressAnimationInterval = null;
-        }
-    }, intervalTime);
+        }, 800); // Update every 800ms for smooth 1% increments
+    }
+    
+    // If target jumped ahead significantly, speed up to catch up
+    if (target > currentProgress + 10) {
+        // For big jumps, update faster temporarily
+        progressBar.style.width = currentProgress + '%';
+        percentageDisplay.textContent = currentProgress + '%';
+    }
 }
 
 // Reset progress state
@@ -791,8 +786,15 @@ async function performExtraction() {
         markdownOutput.value = finalData.markdown;
         mermaidOutput.value = finalData.mermaid;
         
-        // Brief pause to show 100% before transitioning
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Backend already waited 2 seconds at 100%, just ensure animation is done
+        // Calculate remaining animation time to reach 100%
+        const remainingProgress = 100 - currentProgress;
+        const animationTime = remainingProgress > 0 ? (remainingProgress / 5) * 400 : 0;
+        
+        // Wait for animation to complete (backend already showed "Complete" for 2s)
+        if (animationTime > 0) {
+            await new Promise(resolve => setTimeout(resolve, animationTime + 500));
+        }
         
         // Clear intervals before showing results
         clearLoadingIntervals();
@@ -979,8 +981,15 @@ async function generateUserStories() {
             userStoriesTextarea.value = data.markdown;
         }
         
-        // Brief pause to show 100% before transitioning
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Backend already waited 2 seconds at 100%, just ensure animation is done
+        // Calculate remaining animation time to reach 100%
+        const remainingProgress = 100 - currentProgress;
+        const animationTime = remainingProgress > 0 ? (remainingProgress / 5) * 400 : 0;
+        
+        // Wait for animation to complete (backend already showed "Complete" for 2s)
+        if (animationTime > 0) {
+            await new Promise(resolve => setTimeout(resolve, animationTime + 500));
+        }
         
         // Clear intervals before showing results
         clearLoadingIntervals();

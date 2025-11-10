@@ -141,43 +141,82 @@ export class RequirementsRefinementPipeline {
     resolveAttachment?: (id: string) => Promise<string | null>,
     onProgress?: (progress: number, stage: string) => void
   ): Promise<RefinementPipelineResult> {
+    const startTime = Date.now();
     console.log("🚀 [Requirements Extraction] Starting with gpt-4o-mini");
     
-    if (onProgress) onProgress(25, "Sunny is analyzing conversation...");
+    let lastProgressTime = Date.now();
     
-    // Track progress during extraction with periodic updates
+    if (onProgress) {
+      onProgress(25, "Sunny is extracting requirements from conversation...");
+      console.log(`⏱️  [Progress] 25% at ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
+    }
+    
+    // 1) First pass with mini model (this is the slow part - most time spent here)
+    // Set up interval to show progress during extraction
     let currentExtractProgress = 25;
     const progressMessages = [
-      "Sunny is processing conversation...",
+      "Sunny is analyzing conversation context...",
       "Sunny is identifying key features...",
       "Sunny is mapping system components...",
-      "Sunny is structuring requirements..."
+      "Sunny is extracting business rules...",
+      "Sunny is structuring requirements...",
+      "Sunny is capturing user needs...",
+      "Sunny is finalizing extraction..."
     ];
     let messageIndex = 0;
     
+    // Show progress every 5 seconds during extraction (should take ~40-50s)
     const progressInterval = setInterval(() => {
       if (currentExtractProgress < 55) {
-        currentExtractProgress += 5;
+        currentExtractProgress = Math.min(55, currentExtractProgress + 5);
         const message = progressMessages[messageIndex % progressMessages.length];
-        if (onProgress) onProgress(currentExtractProgress, message);
+        if (onProgress) {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+          const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+          onProgress(currentExtractProgress, message);
+          console.log(`⏱️  [Progress] ${currentExtractProgress}% at ${elapsed}s (Δ${delta}s)`);
+          lastProgressTime = Date.now();
+        }
         messageIndex++;
       }
-    }, 2000); // Update every 2 seconds during extraction
+    }, 5000); // Update every 5 seconds to better match actual extraction time
     
-    // 1) First pass with mini model (this is the slow part - most time spent here)
+    const extractionStartTime = Date.now();
     const baseSummary = await this.extractor.extractFromTranscript(
       history,
       resolveAttachment
     );
+    const extractionDuration = Date.now() - extractionStartTime;
+    console.log(`⏱️  [Timing] Extraction took ${(extractionDuration / 1000).toFixed(2)}s`);
     
     // Clear the progress interval
     clearInterval(progressInterval);
 
-    if (onProgress) onProgress(60, "Sunny is analyzing requirements quality...");
+    if (onProgress) {
+      onProgress(60, "Sunny is analyzing requirements quality...");
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+      console.log(`⏱️  [Progress] 60% at ${elapsed}s (Δ${delta}s)`);
+      lastProgressTime = Date.now();
+    }
+    
+    // Add small delay to let progress animation catch up
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // 2) Generate metrics
+    const metricsStartTime = Date.now();
     const metrics = this.docs.analyzeMermaidRelationships(baseSummary);
+    const metricsDuration = Date.now() - metricsStartTime;
+    console.log(`⏱️  [Timing] Metrics analysis took ${(metricsDuration / 1000).toFixed(2)}s`);
     console.log("📊 [Requirements Analysis] Diagram relationship analysis complete");
+    
+    if (onProgress) {
+      onProgress(65, "Sunny is checking relationships...");
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+      console.log(`⏱️  [Progress] 65% at ${elapsed}s (Δ${delta}s)`);
+      lastProgressTime = Date.now();
+    }
     
     if (metrics.actorsWithNoConnections.length > 0) {
       console.log(`⚠️  [Requirements] ${metrics.actorsWithNoConnections.length} actors with no connections: ${metrics.actorsWithNoConnections.join(', ')}`);
@@ -192,19 +231,38 @@ export class RequirementsRefinementPipeline {
       console.log(`⚠️  [Requirements] ${metrics.suspiciousClientEdges.length} suspicious client connections detected`);
     }
 
+    // Add delay to let progress catch up
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     // 3) Decide if refinement is needed
     let finalSummary = baseSummary;
     let wasRefined = false;
 
     if (this.needsRefinement(metrics)) {
       console.log("🔄 [Requirements Refinement] Issues detected, refining with gpt-4o");
-      if (onProgress) onProgress(65, "Sunny is refining requirements for quality...");
+      if (onProgress) {
+        onProgress(70, "Sunny is refining requirements for quality...");
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+        console.log(`⏱️  [Progress] 70% at ${elapsed}s (Δ${delta}s)`);
+        lastProgressTime = Date.now();
+      }
       
+      const refinementStartTime = Date.now();
       const transcript = this.buildTranscript(history);
       finalSummary = await this.refineRequirements(transcript, baseSummary, metrics);
+      const refinementDuration = Date.now() - refinementStartTime;
+      console.log(`⏱️  [Timing] Refinement took ${(refinementDuration / 1000).toFixed(2)}s`);
       wasRefined = true;
       
-      if (onProgress) onProgress(80, "Sunny is verifying improvements...");
+      if (onProgress) {
+        onProgress(80, "Sunny is verifying improvements...");
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+        console.log(`⏱️  [Progress] 80% at ${elapsed}s (Δ${delta}s)`);
+        lastProgressTime = Date.now();
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Re-analyze to show improvement
       const refinedMetrics = this.docs.analyzeMermaidRelationships(finalSummary);
@@ -214,16 +272,45 @@ export class RequirementsRefinementPipeline {
         (metrics.keyModulesMissingOrOrphaned.length - refinedMetrics.keyModulesMissingOrOrphaned.length)
       );
       console.log(`✅ [Requirements Refinement] Complete. Fixed ${issuesFixed} relationship issues`);
+      
+      if (onProgress) {
+        onProgress(85, "Sunny is preparing workflow diagrams...");
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+        console.log(`⏱️  [Progress] 85% at ${elapsed}s (Δ${delta}s)`);
+        lastProgressTime = Date.now();
+      }
+      await new Promise(resolve => setTimeout(resolve, 800));
     } else {
       console.log("✅ [Requirements Extraction] No issues detected, using gpt-4o-mini result");
-      if (onProgress) onProgress(75, "Sunny is generating workflow diagrams...");
+      if (onProgress) {
+        onProgress(75, "Sunny is preparing workflow diagrams...");
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+        console.log(`⏱️  [Progress] 75% at ${elapsed}s (Δ${delta}s)`);
+        lastProgressTime = Date.now();
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    if (onProgress) onProgress(90, "Sunny is generating documentation...");
+    if (onProgress) {
+      onProgress(90, "Sunny is generating documentation...");
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      const delta = ((Date.now() - lastProgressTime) / 1000).toFixed(2);
+      console.log(`⏱️  [Progress] 90% at ${elapsed}s (Δ${delta}s)`);
+      lastProgressTime = Date.now();
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // 4) Generate final documents
+    const docsStartTime = Date.now();
     const markdown = this.docs.generateRequirementsMarkdown(finalSummary);
     const mermaid = this.docs.generateMermaidFlow(finalSummary);
+    const docsDuration = Date.now() - docsStartTime;
+    console.log(`⏱️  [Timing] Document generation took ${(docsDuration / 1000).toFixed(2)}s`);
+    
+    const totalDuration = Date.now() - startTime;
+    console.log(`⏱️  [Timing] Total pipeline took ${(totalDuration / 1000).toFixed(2)}s`);
 
     return {
       requirements: finalSummary,
