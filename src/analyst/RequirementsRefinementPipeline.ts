@@ -228,7 +228,7 @@ export class RequirementsRefinementPipeline {
       console.log(`⚠️  [Requirements] ${metrics.keyModulesMissingOrOrphaned.length} key modules orphaned: ${metrics.keyModulesMissingOrOrphaned.join(', ')}`);
     }
     if (metrics.suspiciousClientEdges.length > 0) {
-      console.log(`⚠️  [Requirements] ${metrics.suspiciousClientEdges.length} suspicious client connections detected`);
+      console.log(`⚠️  [Requirements] ${metrics.suspiciousClientEdges.length} suspicious client connections: ${metrics.suspiciousClientEdges.join(', ')}`);
     }
 
     // Add delay to let progress catch up

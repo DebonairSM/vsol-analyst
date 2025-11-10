@@ -1,3 +1,22 @@
+// Enums matching Prisma schema
+export enum StoryStatus {
+  OPEN = "OPEN",
+  IN_PROGRESS = "IN_PROGRESS",
+  DONE = "DONE"
+}
+
+export enum StoryPriority {
+  MUST_HAVE = "MUST_HAVE",
+  SHOULD_HAVE = "SHOULD_HAVE",
+  NICE_TO_HAVE = "NICE_TO_HAVE"
+}
+
+export enum StoryEffort {
+  SMALL = "SMALL",
+  MEDIUM = "MEDIUM",
+  LARGE = "LARGE"
+}
+
 export interface BusinessContext {
   companyName?: string;
   industry?: string;
@@ -79,6 +98,41 @@ export interface UserStory {
   effort: "small" | "medium" | "large";
   storyPoints?: number;
   sprint?: number;
+}
+
+// Helper functions to convert between formats
+export function convertPriorityToDb(priority: string): StoryPriority {
+  switch (priority) {
+    case "must-have": return StoryPriority.MUST_HAVE;
+    case "should-have": return StoryPriority.SHOULD_HAVE;
+    case "nice-to-have": return StoryPriority.NICE_TO_HAVE;
+    default: return StoryPriority.SHOULD_HAVE;
+  }
+}
+
+export function convertEffortToDb(effort: string): StoryEffort {
+  switch (effort) {
+    case "small": return StoryEffort.SMALL;
+    case "medium": return StoryEffort.MEDIUM;
+    case "large": return StoryEffort.LARGE;
+    default: return StoryEffort.MEDIUM;
+  }
+}
+
+export function convertPriorityFromDb(priority: StoryPriority): string {
+  switch (priority) {
+    case StoryPriority.MUST_HAVE: return "must-have";
+    case StoryPriority.SHOULD_HAVE: return "should-have";
+    case StoryPriority.NICE_TO_HAVE: return "nice-to-have";
+  }
+}
+
+export function convertEffortFromDb(effort: StoryEffort): string {
+  switch (effort) {
+    case StoryEffort.SMALL: return "small";
+    case StoryEffort.MEDIUM: return "medium";
+    case StoryEffort.LARGE: return "large";
+  }
 }
 
 export interface Epic {

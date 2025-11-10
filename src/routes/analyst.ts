@@ -13,6 +13,7 @@ import { UserStoryRefinementPipeline } from "../analyst/UserStoryRefinementPipel
 import { FlowchartGenerator } from "../analyst/FlowchartGenerator";
 import { SYSTEM_PROMPT_ANALYST, SYSTEM_PROMPT_POLISHER } from "../analyst/prompts";
 import { ChatMessage } from "../llm/LLMProvider";
+import { convertPriorityToDb, convertEffortToDb } from "../analyst/RequirementsTypes";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -344,6 +345,14 @@ router.post("/extract-stream", requireAuth, async (req, res) => {
       
       sendProgress(95, "Completing...");
       
+      // Save requirements to database
+      await prisma.project.update({
+        where: { id: projectId },
+        data: {
+          generatedRequirements: result.requirements as any,
+        },
+      });
+      
       // Wait a moment before 100%
       await new Promise(resolve => setTimeout(resolve, 1000));
       
@@ -466,10 +475,30 @@ router.post("/generate-stories-from-requirements", requireAuth, async (req, res)
 // Generate user stories with progress streaming
 router.post("/generate-stories-stream", requireAuth, async (req, res) => {
   try {
-    const { requirements } = req.body;
+    const { requirements, projectId } = req.body;
 
     if (!requirements) {
       return res.status(400).json({ error: "requirements object required" });
+    }
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId required" });
+    }
+
+    const user = req.user as any;
+
+    // Verify project ownership
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        company: {
+          userId: user.id,
+        },
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
     }
 
     // Set up SSE headers
@@ -506,6 +535,66 @@ router.post("/generate-stories-stream", requireAuth, async (req, res) => {
       
       sendProgress(95, "Completing...");
       
+      // Save user stories to database
+      await prisma.project.update({
+        where: { id: projectId },
+        data: {
+          generatedUserStories: result.userStories as any,
+        },
+      });
+
+      // Create Epic and UserStory records
+      for (const epic of result.userStories.epics) {
+        // Create or find epic
+        let dbEpic = await prisma.epic.findFirst({
+          where: {
+            projectId: projectId,
+            name: epic.name,
+          },
+        });
+
+        if (!dbEpic) {
+          dbEpic = await prisma.epic.create({
+            data: {
+              name: epic.name,
+              description: epic.description,
+              icon: epic.icon,
+              projectId: projectId,
+            },
+          });
+        }
+
+        // Create user stories for this epic
+        for (const story of epic.stories) {
+          // Check if story already exists (by id or title)
+          const existingStory = await prisma.userStory.findFirst({
+            where: {
+              projectId: projectId,
+              epicId: dbEpic.id,
+              title: story.title,
+            },
+          });
+
+          if (!existingStory) {
+            await prisma.userStory.create({
+              data: {
+                title: story.title,
+                actor: story.actor,
+                action: story.action,
+                benefit: story.benefit,
+                priority: convertPriorityToDb(story.priority),
+                effort: convertEffortToDb(story.effort),
+                storyPoints: story.storyPoints,
+                sprint: story.sprint,
+                acceptanceCriteria: (story.acceptanceCriteria || []) as any,
+                epicId: dbEpic.id,
+                projectId: projectId,
+              },
+            });
+          }
+        }
+      }
+      
       // Wait a moment before 100%
       await new Promise(resolve => setTimeout(resolve, 1000));
       
@@ -522,6 +611,7 @@ router.post("/generate-stories-stream", requireAuth, async (req, res) => {
         markdown: result.markdown,
         wasRefined: result.wasRefined,
         metrics: result.metrics,
+        saved: true,
       })}\n\n`);
       res.end();
     } catch (error) {
