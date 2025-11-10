@@ -204,7 +204,11 @@ function displayProjects(projects) {
     projects.forEach(project => {
         const projectItem = document.createElement('div');
         projectItem.className = 'project-item';
-        projectItem.onclick = async () => await showChat(project);
+        projectItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between;';
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.style.cssText = 'flex: 1; cursor: pointer;';
+        contentDiv.onclick = async () => await showChat(project);
         
         const nameDiv = document.createElement('div');
         nameDiv.className = 'project-name';
@@ -215,8 +219,21 @@ function displayProjects(projects) {
         const date = new Date(project.updatedAt);
         dateDiv.textContent = `Last updated: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
         
-        projectItem.appendChild(nameDiv);
-        projectItem.appendChild(dateDiv);
+        contentDiv.appendChild(nameDiv);
+        contentDiv.appendChild(dateDiv);
+        
+        // Add branch button
+        const branchBtn = document.createElement('button');
+        branchBtn.innerHTML = '<span class="material-symbols-outlined">account_tree</span>';
+        branchBtn.title = 'Branch Project';
+        branchBtn.style.cssText = 'padding: 0.5rem; background: #8b5cf6; color: white; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; margin-left: 1rem;';
+        branchBtn.onclick = (e) => {
+            e.stopPropagation();
+            showBranchProjectModal(project);
+        };
+        
+        projectItem.appendChild(contentDiv);
+        projectItem.appendChild(branchBtn);
         projectsList.appendChild(projectItem);
     });
 }
@@ -912,7 +929,10 @@ async function generateUserStories() {
             response = await fetch('/analyst/generate-stories-stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ requirements: cachedRequirements })
+                body: JSON.stringify({ 
+                    requirements: cachedRequirements,
+                    projectId: currentProject.id 
+                })
             });
         } else {
             // Fallback to legacy endpoint that re-extracts requirements
@@ -1001,9 +1021,13 @@ async function generateUserStories() {
         // Clear intervals before showing results
         clearLoadingIntervals();
         
-        // Hide loading and show output
+        // Hide loading and show output with action buttons
         storiesLoading.style.display = 'none';
         storiesOutput.style.display = 'block';
+        
+        // Hide generate button and show view/regenerate buttons
+        generateBtn.style.display = 'none';
+        showStoriesActionButtons();
         
     } catch (error) {
         console.error('Error generating user stories:', error);
@@ -1013,6 +1037,407 @@ async function generateUserStories() {
         // Show button again on error
         generateBtn.style.display = 'inline-flex';
         storiesLoading.style.display = 'none';
+    }
+}
+
+function showStoriesActionButtons() {
+    // Check if action buttons container exists, if not create it
+    let actionsContainer = document.getElementById('stories-actions');
+    if (!actionsContainer) {
+        actionsContainer = document.createElement('div');
+        actionsContainer.id = 'stories-actions';
+        actionsContainer.style.cssText = 'display: flex; gap: 0.5rem; margin-bottom: 1rem;';
+        
+        const generateBtn = document.getElementById('generate-stories-btn');
+        generateBtn.parentNode.insertBefore(actionsContainer, generateBtn);
+    }
+    
+    actionsContainer.innerHTML = `
+        <button class="view-stories-btn" onclick="viewUserStoriesBoard()" style="background: #10b981; color: white; padding: 0.875rem 1.5rem; border: none; border-radius: 10px; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 1rem; box-shadow: 0 3px 10px rgba(16,185,129,0.3);">
+            <span class="material-symbols-outlined">view_kanban</span>
+            View Stories
+        </button>
+        <button class="regenerate-stories-btn" onclick="regenerateUserStories()" style="background: #f59e0b; color: white; padding: 0.875rem 1.5rem; border: none; border-radius: 10px; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 1rem; box-shadow: 0 3px 10px rgba(245,158,11,0.3);">
+            <span class="material-symbols-outlined">refresh</span>
+            Regenerate
+        </button>
+    `;
+    actionsContainer.style.display = 'flex';
+}
+
+function regenerateUserStories() {
+    const actionsContainer = document.getElementById('stories-actions');
+    const generateBtn = document.getElementById('generate-stories-btn');
+    const storiesOutput = document.getElementById('stories-output');
+    
+    // Hide actions and output
+    if (actionsContainer) actionsContainer.style.display = 'none';
+    storiesOutput.style.display = 'none';
+    
+    // Show generate button again
+    generateBtn.style.display = 'inline-flex';
+    
+    // Trigger generation
+    generateUserStories();
+}
+
+// User Stories Board Functions
+async function viewUserStoriesBoard() {
+    if (!currentProject) return;
+    
+    try {
+        const response = await fetch(`/api/projects/${currentProject.id}/stories`);
+        if (!response.ok) throw new Error('Failed to fetch user stories');
+        
+        const { epics, statusCounts } = await response.json();
+        
+        // Show modal
+        const modal = document.getElementById('user-stories-board-modal');
+        modal.classList.add('visible');
+        
+        // Render status summary
+        const summaryContainer = document.getElementById('stories-status-summary');
+        summaryContainer.innerHTML = `
+            <div style="flex: 1; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">${statusCounts.open}</div>
+                <div style="color: #6b7280; font-size: 0.875rem;">Open</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">${statusCounts.inProgress}</div>
+                <div style="color: #6b7280; font-size: 0.875rem;">In Progress</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #10b981;">${statusCounts.done}</div>
+                <div style="color: #6b7280; font-size: 0.875rem;">Done</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #111827;">${statusCounts.total}</div>
+                <div style="color: #6b7280; font-size: 0.875rem;">Total</div>
+            </div>
+        `;
+        
+        // Render stories by epic
+        const boardContent = document.getElementById('stories-board-content');
+        boardContent.innerHTML = epics.map(epic => `
+            <div style="margin-bottom: 2rem; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; background: white;">
+                <h4 style="margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem; color: #111827;">
+                    <span style="font-size: 1.5rem;">${epic.icon}</span>
+                    ${epic.name}
+                </h4>
+                <p style="color: #6b7280; margin-bottom: 1.5rem; font-size: 0.95rem;">${epic.description}</p>
+                <div style="display: grid; gap: 1rem;">
+                    ${epic.stories.map(story => renderStoryCard(story)).join('')}
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Error loading user stories:', error);
+        alert('Failed to load user stories');
+    }
+}
+
+function renderStoryCard(story) {
+    const statusColors = {
+        OPEN: { bg: '#dbeafe', text: '#1e40af', label: 'Open' },
+        IN_PROGRESS: { bg: '#fef3c7', text: '#b45309', label: 'In Progress' },
+        DONE: { bg: '#d1fae5', text: '#065f46', label: 'Done' }
+    };
+    
+    const priorityColors = {
+        MUST_HAVE: { bg: '#fee2e2', text: '#991b1b', label: 'Must Have' },
+        SHOULD_HAVE: { bg: '#fef3c7', text: '#b45309', label: 'Should Have' },
+        NICE_TO_HAVE: { bg: '#e0e7ff', text: '#3730a3', label: 'Nice to Have' }
+    };
+    
+    const status = statusColors[story.status] || statusColors.OPEN;
+    const priority = priorityColors[story.priority] || priorityColors.SHOULD_HAVE;
+    
+    return `
+        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; background: #fafafa; cursor: pointer; transition: all 0.2s;" 
+             onclick="editStory('${story.id}')"
+             onmouseover="this.style.boxShadow='0 4px 6px rgba(0,0,0,0.1)'; this.style.transform='translateY(-2px)'"
+             onmouseout="this.style.boxShadow=''; this.style.transform=''">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; color: #111827; margin-bottom: 0.5rem;">${story.title}</div>
+                    <div style="font-size: 0.875rem; color: #6b7280; font-style: italic;">
+                        As a <strong>${story.actor}</strong>, I want to <strong>${story.action}</strong>, so that <strong>${story.benefit}</strong>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                <span style="background: ${status.bg}; color: ${status.text}; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                    ${status.label}
+                </span>
+                <span style="background: ${priority.bg}; color: ${priority.text}; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                    ${priority.label}
+                </span>
+                <span style="background: #f3f4f6; color: #4b5563; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                    ${story.effort}
+                </span>
+                ${story.storyPoints ? `<span style="background: #e0e7ff; color: #4338ca; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">${story.storyPoints} pts</span>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+async function editStory(storyId) {
+    if (!currentProject) return;
+    
+    try {
+        // Fetch all stories to find the one we need
+        const response = await fetch(`/api/projects/${currentProject.id}/stories`);
+        if (!response.ok) throw new Error('Failed to fetch user stories');
+        
+        const { epics } = await response.json();
+        let story = null;
+        for (const epic of epics) {
+            story = epic.stories.find(s => s.id === storyId);
+            if (story) break;
+        }
+        
+        if (!story) {
+            alert('Story not found');
+            return;
+        }
+        
+        // Show edit modal
+        const modal = document.getElementById('edit-story-modal');
+        const formContainer = document.getElementById('edit-story-form');
+        
+        formContainer.innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Title</label>
+                    <input id="edit-story-title" type="text" value="${story.title}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem;">
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Status</label>
+                        <select id="edit-story-status" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <option value="OPEN" ${story.status === 'OPEN' ? 'selected' : ''}>Open</option>
+                            <option value="IN_PROGRESS" ${story.status === 'IN_PROGRESS' ? 'selected' : ''}>In Progress</option>
+                            <option value="DONE" ${story.status === 'DONE' ? 'selected' : ''}>Done</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Priority</label>
+                        <select id="edit-story-priority" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <option value="MUST_HAVE" ${story.priority === 'MUST_HAVE' ? 'selected' : ''}>Must Have</option>
+                            <option value="SHOULD_HAVE" ${story.priority === 'SHOULD_HAVE' ? 'selected' : ''}>Should Have</option>
+                            <option value="NICE_TO_HAVE" ${story.priority === 'NICE_TO_HAVE' ? 'selected' : ''}>Nice to Have</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Effort</label>
+                        <select id="edit-story-effort" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <option value="SMALL" ${story.effort === 'SMALL' ? 'selected' : ''}>Small</option>
+                            <option value="MEDIUM" ${story.effort === 'MEDIUM' ? 'selected' : ''}>Medium</option>
+                            <option value="LARGE" ${story.effort === 'LARGE' ? 'selected' : ''}>Large</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Actor</label>
+                    <input id="edit-story-actor" type="text" value="${story.actor}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+                
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Action</label>
+                    <textarea id="edit-story-action" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; min-height: 60px;">${story.action}</textarea>
+                </div>
+                
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Benefit</label>
+                    <textarea id="edit-story-benefit" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; min-height: 60px;">${story.benefit}</textarea>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Story Points</label>
+                        <input id="edit-story-points" type="number" value="${story.storyPoints || ''}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                    </div>
+                    
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Sprint</label>
+                        <input id="edit-story-sprint" type="number" value="${story.sprint || ''}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                    </div>
+                </div>
+                
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Acceptance Criteria</label>
+                    <div id="acceptance-criteria-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        ${(story.acceptanceCriteria || []).map((ac, index) => `
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <input type="text" class="ac-input" data-index="${index}" value="${ac.description}" style="flex: 1; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px;">
+                                <button onclick="removeAcceptanceCriterion(${index})" style="padding: 0.5rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button onclick="addAcceptanceCriterion()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Add Criterion</button>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
+                    <button onclick="hideEditStoryModal()" style="padding: 0.75rem 1.5rem; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Cancel</button>
+                    <button onclick="saveStory('${storyId}')" style="padding: 0.75rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Save Changes</button>
+                </div>
+            </div>
+        `;
+        
+        modal.classList.add('visible');
+        
+    } catch (error) {
+        console.error('Error loading story for edit:', error);
+        alert('Failed to load story');
+    }
+}
+
+function addAcceptanceCriterion() {
+    const list = document.getElementById('acceptance-criteria-list');
+    const index = list.children.length;
+    const newCriterion = document.createElement('div');
+    newCriterion.style.cssText = 'display: flex; gap: 0.5rem; align-items: center;';
+    newCriterion.innerHTML = `
+        <input type="text" class="ac-input" data-index="${index}" placeholder="New criterion" style="flex: 1; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px;">
+        <button onclick="removeAcceptanceCriterion(${index})" style="padding: 0.5rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+    `;
+    list.appendChild(newCriterion);
+}
+
+function removeAcceptanceCriterion(index) {
+    const list = document.getElementById('acceptance-criteria-list');
+    list.children[index].remove();
+}
+
+async function saveStory(storyId) {
+    if (!currentProject) return;
+    
+    try {
+        // Collect form data
+        const title = document.getElementById('edit-story-title').value;
+        const status = document.getElementById('edit-story-status').value;
+        const priority = document.getElementById('edit-story-priority').value;
+        const effort = document.getElementById('edit-story-effort').value;
+        const actor = document.getElementById('edit-story-actor').value;
+        const action = document.getElementById('edit-story-action').value;
+        const benefit = document.getElementById('edit-story-benefit').value;
+        const storyPoints = document.getElementById('edit-story-points').value;
+        const sprint = document.getElementById('edit-story-sprint').value;
+        
+        // Collect acceptance criteria
+        const acInputs = document.querySelectorAll('.ac-input');
+        const acceptanceCriteria = Array.from(acInputs)
+            .map(input => ({ description: input.value }))
+            .filter(ac => ac.description.trim() !== '');
+        
+        // Update story
+        const response = await fetch(`/api/projects/${currentProject.id}/stories/${storyId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title,
+                status,
+                priority,
+                effort,
+                actor,
+                action,
+                benefit,
+                storyPoints: storyPoints ? parseInt(storyPoints) : null,
+                sprint: sprint ? parseInt(sprint) : null,
+                acceptanceCriteria
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to update story');
+        
+        // Close modal and refresh board
+        hideEditStoryModal();
+        await viewUserStoriesBoard();
+        
+    } catch (error) {
+        console.error('Error saving story:', error);
+        alert('Failed to save story');
+    }
+}
+
+function hideUserStoriesBoard() {
+    const modal = document.getElementById('user-stories-board-modal');
+    modal.classList.remove('visible');
+}
+
+function hideEditStoryModal() {
+    const modal = document.getElementById('edit-story-modal');
+    modal.classList.remove('visible');
+}
+
+// Project Branching Functions
+let branchSourceProject = null;
+
+function showBranchProjectModal(project) {
+    branchSourceProject = project;
+    const modal = document.getElementById('branch-project-modal');
+    const sourceInput = document.getElementById('branch-source-project');
+    const nameInput = document.getElementById('branch-new-project-name');
+    
+    sourceInput.value = project.name;
+    nameInput.value = `${project.name} (Branch)`;
+    
+    modal.classList.add('visible');
+    nameInput.focus();
+    nameInput.select();
+}
+
+function hideBranchProjectModal() {
+    const modal = document.getElementById('branch-project-modal');
+    modal.classList.remove('visible');
+    branchSourceProject = null;
+}
+
+async function confirmBranchProject() {
+    if (!branchSourceProject) return;
+    
+    const nameInput = document.getElementById('branch-new-project-name');
+    const newName = nameInput.value.trim();
+    
+    if (!newName) {
+        alert('Please enter a name for the new project');
+        return;
+    }
+    
+    const confirmBtn = document.getElementById('confirm-branch-btn');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Branching...';
+    
+    try {
+        const response = await fetch(`/api/projects/${branchSourceProject.id}/branch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName })
+        });
+        
+        if (!response.ok) throw new Error('Failed to branch project');
+        
+        const data = await response.json();
+        
+        hideBranchProjectModal();
+        
+        // Show success message
+        alert(`Project branched successfully! ${data.project.epics.reduce((sum, e) => sum + e.stories.length, 0)} user stories copied.`);
+        
+        // Reload projects list
+        await loadProjects();
+        
+    } catch (error) {
+        console.error('Error branching project:', error);
+        alert('Failed to branch project');
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Branch Project';
     }
 }
 

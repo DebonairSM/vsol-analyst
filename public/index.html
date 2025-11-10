@@ -1861,6 +1861,54 @@
         </div>
     </div>
 
+    <div id="user-stories-board-modal" class="modal">
+        <div class="modal-content" style="max-width: 1400px; max-height: 90vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; position: sticky; top: 0; background: white; padding-bottom: 1rem; z-index: 10;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                    <span class="material-symbols-outlined">view_kanban</span>
+                    User Stories Board
+                </h3>
+                <button class="cancel-btn" onclick="hideUserStoriesBoard()" style="padding: 0.5rem 1rem;">Close</button>
+            </div>
+            <div id="stories-status-summary" style="display: flex; gap: 1rem; margin-bottom: 1.5rem; padding: 1rem; background: #f9fafb; border-radius: 8px;"></div>
+            <div id="stories-board-content"></div>
+        </div>
+    </div>
+
+    <div id="edit-story-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0;">Edit User Story</h3>
+                <button class="cancel-btn" onclick="hideEditStoryModal()" style="padding: 0.5rem 1rem;">Close</button>
+            </div>
+            <div id="edit-story-form"></div>
+        </div>
+    </div>
+
+    <div id="branch-project-modal" class="modal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0;">Branch Project</h3>
+                <button class="cancel-btn" onclick="hideBranchProjectModal()" style="padding: 0.5rem 1rem;">Cancel</button>
+            </div>
+            <div style="margin-bottom: 1.5rem;">
+                <p style="color: #6b7280; margin-bottom: 1rem;">Create a new project that copies all user stories from the source project. Done stories remain done, incomplete stories reset to Open.</p>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Source Project</label>
+                    <input id="branch-source-project" type="text" readonly style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb;">
+                </div>
+                <div style="margin-top: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">New Project Name</label>
+                    <input id="branch-new-project-name" type="text" placeholder="Enter new project name" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button onclick="hideBranchProjectModal()" style="padding: 0.75rem 1.5rem; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Cancel</button>
+                <button id="confirm-branch-btn" onclick="confirmBranchProject()" style="padding: 0.75rem 1.5rem; background: #8b5cf6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Branch Project</button>
+            </div>
+        </div>
+    </div>
+
     <div id="seed-data-modal" class="modal">
         <div class="modal-content output-modal-content">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
