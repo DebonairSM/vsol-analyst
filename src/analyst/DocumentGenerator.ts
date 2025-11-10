@@ -410,227 +410,21 @@ export class DocumentGenerator {
   }
 
   generateMermaidFlow(req: RequirementsSummary): string {
-    // Simple mode: render all actors + modules with full bipartite edges (debugging)
-    if (this.simpleMode) {
-      const lines = ["flowchart TD"];
-      const usedIds = new Set<string>();
-      const actorIds = new Map<string, string>();
-      const moduleIds = new Map<string, string>();
-      
-      for (const actor of req.mainActors || []) {
-        const actorId = this.makeIdFromName(actor.name, usedIds);
-        actorIds.set(actor.name, actorId);
-        lines.push(`  ${actorId}["${actor.name}"]`);
-      }
-      for (const mod of req.candidateModules || []) {
-        const modId = this.makeIdFromName(mod.name, usedIds);
-        moduleIds.set(mod.name, modId);
-        lines.push(`  ${modId}["${mod.name}"]`);
-      }
-      for (const actor of req.mainActors || []) {
-        const actorId = actorIds.get(actor.name)!;
-        for (const mod of req.candidateModules || []) {
-          const modId = moduleIds.get(mod.name)!;
-          lines.push(`  ${actorId} --> ${modId}`);
-        }
-      }
-      return "```mermaid\n" + lines.join("\n") + "\n```";
-    }
-
-    // Continue with intelligent inference below...
-    const lines: string[] = [];
-    lines.push("flowchart TD");
-
-    const debugEnabled = 
-      process.env.NODE_ENV !== "production" &&
-      process.env.MERMAID_DEBUG_RELATIONS === "true";
-    const debugScores: string[] | null = debugEnabled ? [] : null;
-
-    const usedIds = new Set<string>();
-
-    const hasActors = req.mainActors?.length > 0;
-    const hasModules = req.candidateModules?.length > 0;
-
-    // Handle partial extraction gracefully
-    if (!hasActors && !hasModules) {
-      lines.push("  NoData[No actors or modules identified]");
-      return "```mermaid\n" + lines.join("\n") + "\n```";
-    }
-
-    if (!hasActors) {
-      lines.push("  NoActors[No actors identified]");
-    }
-
-    if (!hasModules) {
-      lines.push("  NoModules[No modules identified]");
-      // Early return: no modules means no meaningful edges or tools to process
-      // Still render actors if present
-      if (hasActors) {
-        const actors = [...req.mainActors!].sort((a, b) => a.name.localeCompare(b.name));
-        const usedIds = new Set<string>();
-        for (const actor of actors) {
-          const id = this.makeIdFromName(actor.name, usedIds);
-          lines.push(`  ${id}["${actor.name}"]`);
-        }
-      }
-      return "```mermaid\n" + lines.join("\n") + "\n```";
-    }
-
-    // Sort for deterministic output
-    const actors = [...(req.mainActors || [])].sort((a, b) => 
-      a.name.localeCompare(b.name)
-    );
-    const modules = [...(req.candidateModules || [])].sort((a, b) => 
-      a.name.localeCompare(b.name)
-    );
-
-    // Actor keywords cache
-    const actorKeywordCache = new Map<string, string[]>();
-    const getActorKeywords = (actor: Actor): string[] => {
-      if (!actorKeywordCache.has(actor.name)) {
-        actorKeywordCache.set(actor.name, this.extractActorKeywords(actor.name));
-      }
-      return actorKeywordCache.get(actor.name)!;
-    };
-
-    // Module data (single normalization pass)
-    const moduleDataMap = new Map<string, {
-      descWords: Set<string>,
-      nameWords: Set<string>
-    }>();
-
-    for (const mod of modules) {
-      moduleDataMap.set(mod.name, {
-        descWords: this.normalizeText(mod.description || ""),
-        nameWords: this.normalizeText(mod.name)
-      });
-    }
-
-    // Tools (precompute once)
-    // Future: if RequirementsSummary.currentTools carries direction info,
-    // we can flip edges (Module --> Tool) for exports, etc.
-    const tools = (req.currentTools || []).map(tool => ({
-      name: tool,
-      words: this.normalizeText(tool),
-      id: "", // Will be set during node generation
-    }));
-
-    // Actor nodes
-    const actorIdMap = new Map<string, string>();
-    for (const actor of actors) {
-      const id = this.makeIdFromName(actor.name, usedIds);
-      actorIdMap.set(actor.name, id);
-      lines.push(`  ${id}["${actor.name}"]`);
-    }
-
-    // Module nodes
-    const moduleIdMap = new Map<string, string>();
-    for (const mod of modules) {
-      const id = this.makeIdFromName(mod.name, usedIds);
-      moduleIdMap.set(mod.name, id);
-      lines.push(`  ${id}["${mod.name}"]`);
-    }
-
-    // Tool nodes (if mentioned in modules)
-    const toolIdMap = new Map<string, string>();
-    for (const tool of tools) {
-      for (const mod of modules) {
-        const md = moduleDataMap.get(mod.name);
-        if (!md) continue; // Safety net
-        
-        const hasTool = [...tool.words].some(w => md.descWords.has(w));
-        
-        if (hasTool && !toolIdMap.has(tool.name)) {
-          const id = this.makeIdFromName(tool.name, usedIds);
-          toolIdMap.set(tool.name, id);
-          tool.id = id;
-          lines.push(`  ${id}["${tool.name}"]`);
-          break;
-        }
-      }
-    }
-
-    // Edge generation
-    const edges: string[] = [];
-
-    for (const actor of actors) {
-      const actorId = actorIdMap.get(actor.name)!;
-      const actorKeywords = getActorKeywords(actor);
-      const perActorScores = new Map<string, number>();
-      let connections = 0;
-      
-      for (const mod of modules) {
-        const modId = moduleIdMap.get(mod.name)!;
-        const md = moduleDataMap.get(mod.name);
-        if (!md) continue; // Safety net
-        
-        const score = this.scoreActorModuleRelation(
-          actor, mod, req, actorKeywords, md.descWords, md.nameWords
-        );
-        
-        perActorScores.set(mod.name, score);
-        
-        if (debugEnabled) {
-          debugScores!.push(`${actor.name} -> ${mod.name}: ${score}`);
-        }
-        
-        if (score >= this.scoreThreshold) {
-          edges.push(`  ${actorId} --> ${modId}`);
-          connections++;
-        }
-      }
-      
-      // Fallback for isolated actors (reuses computed scores)
-      if (connections === 0) {
-        const fallback = this.findBestFallbackModule(actor, modules, perActorScores);
-        if (fallback && fallback.score > 0) {
-          const fallbackId = moduleIdMap.get(fallback.module.name)!;
-          edges.push(`  ${actorId} --> ${fallbackId}   %% fallback`);
-        }
-      }
-    }
-
-    lines.push(...edges);
-
-    // Tool edges (consistent: Tool --> Module)
-    const toolEdges: string[] = [];
-    for (const tool of tools) {
-      if (!toolIdMap.has(tool.name)) continue;
-      
-      const toolId = toolIdMap.get(tool.name)!;
-      for (const mod of modules) {
-        const md = moduleDataMap.get(mod.name);
-        if (!md) continue; // Safety net
-        
-        const hasTool = [...tool.words].some(w => md.descWords.has(w));
-        
-        if (hasTool) {
-          const modId = moduleIdMap.get(mod.name)!;
-          toolEdges.push(`  ${toolId} --> ${modId}   %% integration`);
-        }
-      }
+    // The LLM now generates the Mermaid diagram directly
+    // We just need to wrap it in markdown code fences
+    if (!req.workflowDiagram || req.workflowDiagram.trim() === "") {
+      return "```mermaid\nflowchart TD\n  no_diagram[\"No workflow diagram generated\"]\n```";
     }
     
-    // Add tool edges with blank line separator if we have both types of edges
-    if (toolEdges.length > 0) {
-      if (edges.length > 0) {
-        lines.push(""); // Blank line separator between actor and tool edges
-      }
-      lines.push(...toolEdges);
+    // If already wrapped in code fences, return as-is
+    if (req.workflowDiagram.trim().startsWith("```mermaid")) {
+      return req.workflowDiagram;
     }
-
-    // Debug output with legend
-    if (debugEnabled) {
-      lines.push("");
-      lines.push("%% Debug: relationship scores");
-      lines.push(`%% Legend: 0=none, 1=weak alignment, 2+=strong enough for edge (threshold ${this.scoreThreshold})`);
-      for (const debugLine of debugScores!) {
-        lines.push(`%% ${debugLine}`);
-      }
-    }
-
-    return "```mermaid\n" + lines.join("\n") + "\n```";
+    
+    // Otherwise wrap it
+    return "```mermaid\n" + req.workflowDiagram.trim() + "\n```";
   }
+
 
   generateUserStoriesMarkdown(userStories: UserStoriesOutput): string {
     const lines: string[] = [];
@@ -702,9 +496,34 @@ export class DocumentGenerator {
 
     const actors = req.mainActors || [];
     const modules = req.candidateModules || [];
+    const tools = req.currentTools || [];
 
-    if (actors.length === 0 || modules.length === 0) {
+    if (actors.length === 0 || modules.length === 0 || !req.workflowDiagram) {
       return metrics;
+    }
+
+    // Parse the Mermaid diagram to find connections
+    const diagram = req.workflowDiagram;
+    
+    // Extract node definitions and labels
+    const nodeLabels = new Map<string, string>(); // nodeId -> label
+    const nodeRegex = /(\w+)\["([^"]+)"\]/g;
+    let match;
+    while ((match = nodeRegex.exec(diagram)) !== null) {
+      nodeLabels.set(match[1], match[2]);
+    }
+
+    // Create reverse lookup: label -> nodeId
+    const labelToId = new Map<string, string>();
+    for (const [id, label] of nodeLabels.entries()) {
+      labelToId.set(label, id);
+    }
+
+    // Extract edges (connections)
+    const edges: Array<{from: string, to: string}> = [];
+    const edgeRegex = /(\w+)\s*-->\s*(\w+)/g;
+    while ((match = edgeRegex.exec(diagram)) !== null) {
+      edges.push({ from: match[1], to: match[2] });
     }
 
     // Track connections per actor and module
@@ -718,52 +537,40 @@ export class DocumentGenerator {
       moduleConnections.set(mod.name, 0);
     }
 
-    // Precompute actor keywords and module data
-    const actorKeywordCache = new Map<string, string[]>();
-    for (const actor of actors) {
-      actorKeywordCache.set(actor.name, this.extractActorKeywords(actor.name));
-    }
+    // Count connections by matching actor/module names to node labels
+    for (const edge of edges) {
+      const fromLabel = nodeLabels.get(edge.from) || "";
+      const toLabel = nodeLabels.get(edge.to) || "";
 
-    const moduleDataMap = new Map<string, {
-      descWords: Set<string>,
-      nameWords: Set<string>
-    }>();
-    for (const mod of modules) {
-      moduleDataMap.set(mod.name, {
-        descWords: this.normalizeText(mod.description || ""),
-        nameWords: this.normalizeText(mod.name)
-      });
-    }
-
-    // Run scoring to find connections
-    for (const actor of actors) {
-      const actorKeywords = actorKeywordCache.get(actor.name)!;
-      const perActorScores = new Map<string, number>();
-      let connections = 0;
-
-      for (const mod of modules) {
-        const md = moduleDataMap.get(mod.name);
-        if (!md) continue;
-
-        const score = this.scoreActorModuleRelation(
-          actor, mod, req, actorKeywords, md.descWords, md.nameWords
-        );
-
-        perActorScores.set(mod.name, score);
-
-        if (score >= this.scoreThreshold) {
-          connections++;
+      // Check if this edge involves an actor
+      for (const actor of actors) {
+        if (fromLabel === actor.name || toLabel === actor.name) {
           actorConnections.set(actor.name, actorConnections.get(actor.name)! + 1);
+        }
+      }
+
+      // Check if this edge involves a module
+      for (const mod of modules) {
+        if (fromLabel === mod.name || toLabel === mod.name) {
           moduleConnections.set(mod.name, moduleConnections.get(mod.name)! + 1);
         }
       }
 
-      // Check fallback
-      if (connections === 0) {
-        const fallback = this.findBestFallbackModule(actor, modules, perActorScores);
-        if (fallback && fallback.score > 0) {
-          actorConnections.set(actor.name, 1);
-          moduleConnections.set(fallback.module.name, moduleConnections.get(fallback.module.name)! + 1);
+      // Check for suspicious client edges
+      const clientActor = actors.find(a => 
+        fromLabel === a.name && CLIENT_ROLES.some(role => a.name.toLowerCase().includes(role))
+      );
+      if (clientActor) {
+        const targetModule = modules.find(m => toLabel === m.name);
+        if (targetModule) {
+          const modNameLower = targetModule.name.toLowerCase();
+          const isClientFacing = modNameLower.includes("portal") || 
+                                 modNameLower.includes("client") ||
+                                 modNameLower.includes("viewing");
+          
+          if (!isClientFacing) {
+            metrics.suspiciousClientEdges.push(`${clientActor.name} --> ${targetModule.name}`);
+          }
         }
       }
     }
@@ -779,37 +586,6 @@ export class DocumentGenerator {
     for (const mod of modules) {
       if (moduleConnections.get(mod.name) === 0) {
         metrics.modulesWithNoConnections.push(mod.name);
-      }
-    }
-
-    // Check for suspicious client edges
-    const clientActors = actors.filter(a => {
-      const nameLower = a.name.toLowerCase();
-      return CLIENT_ROLES.some(role => nameLower.includes(role));
-    });
-
-    for (const clientActor of clientActors) {
-      const actorKeywords = actorKeywordCache.get(clientActor.name)!;
-      
-      for (const mod of modules) {
-        const md = moduleDataMap.get(mod.name);
-        if (!md) continue;
-
-        const score = this.scoreActorModuleRelation(
-          clientActor, mod, req, actorKeywords, md.descWords, md.nameWords
-        );
-
-        // If client connects to a non-portal, non-client-facing module, flag it
-        if (score >= this.scoreThreshold) {
-          const modNameLower = mod.name.toLowerCase();
-          const isClientFacing = modNameLower.includes("portal") || 
-                                 modNameLower.includes("client") ||
-                                 modNameLower.includes("viewing");
-          
-          if (!isClientFacing) {
-            metrics.suspiciousClientEdges.push(`${clientActor.name} --> ${mod.name}`);
-          }
-        }
       }
     }
 

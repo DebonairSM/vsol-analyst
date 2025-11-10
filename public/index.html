@@ -1769,6 +1769,62 @@
                         <button class="download-btn" onclick="downloadUserStories()">Download user-stories.md</button>
                     </div>
                 </div>
+                <div class="output-section" style="margin-top: 1.5rem;">
+                    <h4 style="margin-bottom: 0.5rem; color: #111827; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="material-symbols-outlined">database</span>
+                        Seed Data Generator
+                    </h4>
+                    <button id="show-seed-data-btn" class="generate-stories-btn" onclick="showSeedDataModal()" style="background: #059669; color: white; box-shadow: 0 3px 10px rgba(5,150,105,0.3); padding: 0.875rem 1.5rem; border: none; border-radius: 10px; font-weight: 600; transition: all 0.3s; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 1rem; margin-bottom: 1rem;">
+                        <span class="material-symbols-outlined">table_chart</span>
+                        Generate Seed Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="seed-data-modal" class="modal">
+        <div class="modal-content output-modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0;">Generate Seed Data</h3>
+                <button class="cancel-btn" onclick="hideSeedDataModal()" style="padding: 0.5rem 1rem;">Close</button>
+            </div>
+            <div id="seed-data-loading" style="display: none; text-align: center; padding: 2rem;">
+                <img src="/assets/sunny-face.png" alt="Sunny" class="extraction-loading-avatar" width="80" height="80" style="width:80px;height:80px;margin:0 auto;">
+                <p style="color: #6b7280; margin-top: 1rem; font-size: 0.95rem;">Loading spreadsheet data...</p>
+                <div class="loading-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+            <div id="seed-data-content" style="display: none;">
+                <div style="margin-bottom: 1.5rem;">
+                    <h4 style="margin-bottom: 0.75rem; color: #111827;">Select Spreadsheet:</h4>
+                    <select id="spreadsheet-select" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem; cursor: pointer;">
+                        <option value="">-- Choose a spreadsheet --</option>
+                    </select>
+                </div>
+                <div id="spreadsheet-details" style="display: none;">
+                    <h4 style="margin-bottom: 0.75rem; color: #111827;">Export Format:</h4>
+                    <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                        <button class="export-format-btn" onclick="exportAsJSON()" style="background: #2563eb; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                            <span class="material-symbols-outlined">code</span> JSON
+                        </button>
+                        <button class="export-format-btn" onclick="exportAsSQL()" style="background: #7c3aed; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                            <span class="material-symbols-outlined">storage</span> SQL
+                        </button>
+                        <button class="export-format-btn" onclick="exportAsCSV()" style="background: #059669; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                            <span class="material-symbols-outlined">description</span> CSV
+                        </button>
+                    </div>
+                    <div style="background: #f9fafb; border: 2px solid #e5e7eb; border-radius: 8px; padding: 1rem;">
+                        <h4 style="margin-bottom: 0.5rem; color: #111827; font-size: 0.95rem;">Preview:</h4>
+                        <div id="spreadsheet-preview" style="max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; color: #374151; white-space: pre-wrap;">
+                            Select a spreadsheet to see preview
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

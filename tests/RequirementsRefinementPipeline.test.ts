@@ -23,15 +23,20 @@ describe("DocumentGenerator.analyzeMermaidRelationships", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  owner["Owner"]
+  reporting_dashboard["Reporting Dashboard"]
+  client["Client"]
+  owner --> reporting_dashboard`
       };
 
       const metrics = docs.analyzeMermaidRelationships(req);
 
-      // Owner should connect to dashboard (management role + dashboard keyword)
+      // Owner should connect to dashboard (has edge in diagram)
       expect(metrics.actorsWithNoConnections).not.toContain("Owner");
       
-      // Client with no clear connection should be isolated
+      // Client with no edges should be isolated
       expect(metrics.actorsWithNoConnections).toContain("Client");
     });
 
@@ -52,12 +57,16 @@ describe("DocumentGenerator.analyzeMermaidRelationships", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  manager["Manager"]
+  dashboard["Dashboard"]
+  manager --> dashboard`
       };
 
       const metrics = docs.analyzeMermaidRelationships(req);
 
-      // Manager should connect via management-module affinity
+      // Manager should have connection in diagram
       expect(metrics.actorsWithNoConnections).toHaveLength(0);
     });
   });
@@ -81,15 +90,20 @@ describe("DocumentGenerator.analyzeMermaidRelationships", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  customer["Customer"]
+  product_catalog["Product Catalog"]
+  admin_panel["Admin Panel"]
+  customer --> product_catalog`
       };
 
       const metrics = docs.analyzeMermaidRelationships(req);
 
-      // Customer should connect to catalog
+      // Customer connects to catalog (has edge)
       expect(metrics.modulesWithNoConnections).not.toContain("Product Catalog");
       
-      // Admin Panel should be orphaned (no admin actor)
+      // Admin Panel has no edges - orphaned
       expect(metrics.modulesWithNoConnections).toContain("Admin Panel");
     });
   });
@@ -112,7 +126,11 @@ describe("DocumentGenerator.analyzeMermaidRelationships", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  client_omnigo["Client (Omnigo)"]
+  automated_reminders["Automated Reminders"]
+  client_omnigo --> automated_reminders`
       };
 
       const metrics = docs.analyzeMermaidRelationships(req);
@@ -140,7 +158,11 @@ describe("DocumentGenerator.analyzeMermaidRelationships", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  client["Client"]
+  client_portal["Client Portal"]
+  client --> client_portal`
       };
 
       const metrics = docs.analyzeMermaidRelationships(req);
@@ -169,12 +191,17 @@ describe("DocumentGenerator.analyzeMermaidRelationships", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  user["User"]
+  status_tracking["Status Tracking"]
+  other_module["Other Module"]
+  user --> other_module`
       };
 
       const metrics = docs.analyzeMermaidRelationships(req);
 
-      // Status Tracking is a key module and should be flagged if orphaned
+      // Status Tracking has no edges - orphaned key module
       expect(metrics.keyModulesMissingOrOrphaned).toContain("Status Tracking");
       
       // Other Module is not a key module
@@ -198,12 +225,16 @@ describe("DocumentGenerator.analyzeMermaidRelationships", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  owner["Owner"]
+  status_tracking["Status Tracking"]
+  owner --> status_tracking`
       };
 
       const metrics = docs.analyzeMermaidRelationships(req);
 
-      // Status Tracking should be connected
+      // Status Tracking is connected
       expect(metrics.keyModulesMissingOrOrphaned).not.toContain("Status Tracking");
     });
   });
@@ -233,15 +264,20 @@ describe("DocumentGenerator.analyzeMermaidRelationships", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  consultants["Consultants"]
+  owner["Owner"]
+  invoice_portal["Invoice Submission Portal"]
+  consultants --> invoice_portal`
       };
 
       const metrics = docs.analyzeMermaidRelationships(req);
 
-      // Should detect orphaned actors (Wife of Owner likely has no clear connections)
+      // Should detect orphaned actors
       expect(metrics.actorsWithNoConnections.length).toBeGreaterThan(0);
       
-      // Should detect orphaned key modules (Workflow Dashboard, Status Tracking if poorly described)
+      // Should detect orphaned key modules
       expect(metrics.keyModulesMissingOrOrphaned.length).toBeGreaterThan(0);
     });
 
@@ -268,7 +304,23 @@ describe("DocumentGenerator.analyzeMermaidRelationships", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  consultants["Consultants"]
+  owner["Owner"]
+  wife["Wife of Owner"]
+  invoice_portal["Invoice Submission Portal"]
+  reminders["Automated Reminders"]
+  reporting["Reporting and Analytics"]
+  status["Status Tracking"]
+  dashboard["Workflow Visualization Dashboard"]
+  consultants --> invoice_portal
+  consultants --> reminders
+  owner --> reporting
+  owner --> status
+  owner --> dashboard
+  wife --> reporting
+  wife --> status`
       };
 
       const metrics = docs.analyzeMermaidRelationships(req);
@@ -300,7 +352,8 @@ describe("DocumentGenerator.analyzeMermaidRelationships", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: ""
       };
 
       const metrics = docs.analyzeMermaidRelationships(req);
@@ -326,7 +379,8 @@ describe("DocumentGenerator.analyzeMermaidRelationships", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: ""
       };
 
       const metrics = docs.analyzeMermaidRelationships(req);

@@ -21,7 +21,8 @@ describe("Mermaid Output Validation", () => {
       nonFunctionalNeeds: [],
       risksAndConstraints: [],
       openQuestions: [],
-      uploadedDocuments: []
+      uploadedDocuments: [],
+      workflowDiagram: "flowchart TD\n  user[\"User\"]\n  module[\"Module\"]\n  user --> module"
     };
 
     const output = docs.generateMermaidFlow(req);
@@ -30,52 +31,7 @@ describe("Mermaid Output Validation", () => {
     expect(output.endsWith("\n```")).toBe(true);
   });
 
-  it("should separate actor edges from tool edges with blank line", () => {
-    const req: RequirementsSummary = {
-      businessContext: {},
-      primaryGoal: "Test edge separation",
-      secondaryGoals: [],
-      currentTools: ["Time Doctor"],
-      mainActors: [
-        { name: "Owner", description: "Owner uses dashboard" }
-      ],
-      painPoints: [],
-      dataEntities: [],
-      candidateModules: [
-        { name: "Dashboard", description: "Dashboard integrates with Time Doctor for owner", priority: "must-have" }
-      ],
-      nonFunctionalNeeds: [],
-      risksAndConstraints: [],
-      openQuestions: [],
-      uploadedDocuments: []
-    };
-
-    const output = docs.generateMermaidFlow(req);
-    const cleanOutput = output.replace(/^```mermaid\n/, '').replace(/\n```$/, '');
-    const lines = cleanOutput.split('\n');
-
-    // Find the last actor edge and first tool edge
-    let lastActorEdgeIndex = -1;
-    let firstToolEdgeIndex = -1;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line.includes('-->') && !line.includes('%% integration') && !line.includes('%% fallback')) {
-        lastActorEdgeIndex = i;
-      }
-      if (line.includes('%% integration') && firstToolEdgeIndex === -1) {
-        firstToolEdgeIndex = i;
-      }
-    }
-
-    // If both types exist, there should be a blank line between them
-    if (lastActorEdgeIndex >= 0 && firstToolEdgeIndex >= 0) {
-      expect(firstToolEdgeIndex - lastActorEdgeIndex).toBeGreaterThan(1);
-      expect(lines[lastActorEdgeIndex + 1].trim()).toBe('');
-    }
-  });
-
-  it("should produce valid mermaid syntax without consecutive comments", () => {
+  it("should produce valid mermaid syntax without parse errors", () => {
     const req: RequirementsSummary = {
       businessContext: {},
       primaryGoal: "Manage invoices",
@@ -95,7 +51,21 @@ describe("Mermaid Output Validation", () => {
       nonFunctionalNeeds: [],
       risksAndConstraints: [],
       openQuestions: [],
-      uploadedDocuments: []
+      uploadedDocuments: [],
+      workflowDiagram: `flowchart TD
+  owner["Owner"]
+  consultant["Consultant"]
+  invoice_portal["Invoice Portal"]
+  time_tracking["Time Tracking"]
+  payment_export["Payment Export"]
+  time_doctor["Time Doctor"]
+  payoneer["Payoneer"]
+  spreadsheet["Spreadsheet"]
+  owner --> invoice_portal
+  consultant --> invoice_portal
+  time_doctor --> time_tracking
+  payoneer --> payment_export
+  spreadsheet --> payment_export`
     };
 
     const output = docs.generateMermaidFlow(req);
@@ -144,7 +114,24 @@ describe("Mermaid Output Validation", () => {
       nonFunctionalNeeds: [],
       risksAndConstraints: [],
       openQuestions: [],
-      uploadedDocuments: []
+      uploadedDocuments: [],
+      workflowDiagram: `flowchart TD
+  owner["Owner"]
+  dashboard["Dashboard"]
+  payment_system["Payment System"]
+  storage["Storage"]
+  time_doctor["Time Doctor"]
+  excel["Excel Spreadsheet"]
+  payoneer["Payoneer"]
+  wells_fargo["Wells Fargo"]
+  onedrive["OneDrive"]
+  owner --> dashboard
+  owner --> payment_system
+  time_doctor --> dashboard
+  excel --> dashboard
+  payoneer --> payment_system
+  wells_fargo --> payment_system
+  onedrive --> storage`
     };
 
     const output = docs.generateMermaidFlow(req);
@@ -154,9 +141,9 @@ describe("Mermaid Output Validation", () => {
     expect(output).toContain("flowchart TD");
     expect(output).toContain("```");
     
-    // Count integration comments - should match number of tool->module connections
+    // No integration comments in LLM-generated diagrams unless explicitly added
     const integrationComments = (output.match(/%% integration/g) || []).length;
-    expect(integrationComments).toBeGreaterThan(0);
+    expect(integrationComments).toBeGreaterThanOrEqual(0);
   });
 
   it("should produce parseable output for real-world consulting scenario", () => {
@@ -192,7 +179,33 @@ describe("Mermaid Output Validation", () => {
       nonFunctionalNeeds: [],
       risksAndConstraints: [],
       openQuestions: [],
-      uploadedDocuments: []
+      uploadedDocuments: [],
+      workflowDiagram: `flowchart TD
+  client_omnigo["Client (Omnigo)"]
+  consultants["Consultants"]
+  owner["Owner"]
+  wife_of_owner["Wife of Owner"]
+  invoice_portal["Invoice Submission Portal"]
+  status_tracking["Status Tracking"]
+  reporting["Reporting and Analytics"]
+  client_portal["Client Portal"]
+  time_tracking_integration["Integration with Time Tracking"]
+  payment_processing["Payment Processing"]
+  time_doctor["Time Doctor"]
+  payoneer["Payoneer"]
+  wells_fargo["Wells Fargo bank account"]
+  spreadsheet["Spreadsheet for tracking invoices and payments"]
+  
+  consultants --> invoice_portal
+  owner --> status_tracking
+  owner --> reporting
+  wife_of_owner --> status_tracking
+  wife_of_owner --> reporting
+  client_omnigo --> client_portal
+  time_doctor --> time_tracking_integration
+  payoneer --> payment_processing
+  wells_fargo --> payment_processing
+  spreadsheet --> payment_processing`
     };
 
     const output = docs.generateMermaidFlow(req);

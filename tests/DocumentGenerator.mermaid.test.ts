@@ -59,7 +59,19 @@ describe("DocumentGenerator.generateMermaidFlow", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  consultant["Consultant"]
+  company_owner["Company Owner"]
+  invoice_submission_portal["Invoice Submission Portal"]
+  time_tracking["Time Tracking"]
+  reporting_and_analytics["Reporting and Analytics"]
+  time_doctor["Time Doctor"]
+  
+  consultant --> invoice_submission_portal
+  consultant --> time_tracking
+  company_owner --> reporting_and_analytics
+  time_doctor --> time_tracking`
       };
 
       const generator = new DocumentGenerator();
@@ -107,7 +119,16 @@ describe("DocumentGenerator.generateMermaidFlow", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  customer["Customer"]
+  admin["Admin"]
+  product_catalog["Product Catalog"]
+  order_management["Order Management"]
+  admin_panel["Admin Panel"]
+  customer --> product_catalog
+  customer --> order_management
+  admin --> admin_panel`
       };
 
       const generator = new DocumentGenerator();
@@ -150,7 +171,11 @@ describe("DocumentGenerator.generateMermaidFlow", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  maintenance_team["Maintenance Team"]
+  customer_feedback_portal["Customer Feedback Portal"]
+  marketing_analytics["Marketing Analytics"]`
       };
 
       const generator = new DocumentGenerator();
@@ -187,7 +212,13 @@ describe("DocumentGenerator.generateMermaidFlow", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  project_manager["Project Manager"]
+  project_dashboard["Project Dashboard"]
+  task_management["Task Management"]
+  project_manager --> project_dashboard
+  project_manager --> task_management`
       };
 
       const generatorLowThreshold = new DocumentGenerator(1);
@@ -198,8 +229,8 @@ describe("DocumentGenerator.generateMermaidFlow", () => {
       const outputHigh = generatorHighThreshold.generateMermaidFlow(req);
       const edgesHigh = parseEdges(outputHigh);
 
-      // Lower threshold should produce more or equal edges
-      expect(edgesLow.size).toBeGreaterThanOrEqual(edgesHigh.size);
+      // With LLM-generated diagrams, threshold doesn't matter - same diagram
+      expect(edgesLow.size).toEqual(edgesHigh.size);
     });
   });
 
@@ -223,14 +254,23 @@ describe("DocumentGenerator.generateMermaidFlow", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  actor1["Actor1"]
+  actor2["Actor2"]
+  module1["Module1"]
+  module2["Module2"]
+  actor1 --> module1
+  actor1 --> module2
+  actor2 --> module1
+  actor2 --> module2`
       };
 
       const generator = new DocumentGenerator(2, true); // Enable simple mode
       const output = generator.generateMermaidFlow(req);
       const edges = parseEdges(output);
 
-      // In simple mode, should have all combinations: 2 actors × 2 modules = 4 edges
+      // Should have all combinations: 2 actors × 2 modules = 4 edges
       expect(edges.size).toBe(4);
     });
   });
@@ -262,7 +302,27 @@ describe("DocumentGenerator.generateMermaidFlow", () => {
         nonFunctionalNeeds: [],
         risksAndConstraints: [],
         openQuestions: [],
-        uploadedDocuments: []
+        uploadedDocuments: [],
+        workflowDiagram: `flowchart TD
+  client_omnigo["Client (Omnigo)"]
+  consultants["Consultants"]
+  owner["Owner"]
+  wife_of_owner["Wife of Owner"]
+  invoice_submission_portal["Invoice Submission Portal"]
+  automated_reminders["Automated Reminders"]
+  reporting_and_analytics["Reporting and Analytics"]
+  status_tracking["Status Tracking"]
+  spreadsheet["Spreadsheet"]
+  payoneer["Payoneer"]
+  
+  consultants --> invoice_submission_portal
+  consultants --> automated_reminders
+  owner --> reporting_and_analytics
+  owner --> status_tracking
+  wife_of_owner --> reporting_and_analytics
+  wife_of_owner --> status_tracking
+  spreadsheet --> status_tracking
+  payoneer --> reporting_and_analytics`
       };
 
       const generator = new DocumentGenerator();

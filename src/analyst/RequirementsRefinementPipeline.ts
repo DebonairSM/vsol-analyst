@@ -42,6 +42,11 @@ export class RequirementsRefinementPipeline {
       return true;
     }
 
+    // Any module with no connections?
+    if (metrics.modulesWithNoConnections.length > 0) {
+      return true;
+    }
+
     // Important modules should have at least one actor
     if (metrics.keyModulesMissingOrOrphaned.length > 0) {
       return true;
@@ -135,6 +140,8 @@ export class RequirementsRefinementPipeline {
     history: ChatMessage[],
     resolveAttachment?: (id: string) => Promise<string | null>
   ): Promise<RefinementPipelineResult> {
+    console.log("🚀 [Requirements Extraction] Starting with gpt-4o-mini");
+    
     // 1) First pass with mini model
     const baseSummary = await this.extractor.extractFromTranscript(
       history,
@@ -143,15 +150,41 @@ export class RequirementsRefinementPipeline {
 
     // 2) Generate metrics
     const metrics = this.docs.analyzeMermaidRelationships(baseSummary);
+    console.log("📊 [Requirements Analysis] Diagram relationship analysis complete");
+    
+    if (metrics.actorsWithNoConnections.length > 0) {
+      console.log(`⚠️  [Requirements] ${metrics.actorsWithNoConnections.length} actors with no connections: ${metrics.actorsWithNoConnections.join(', ')}`);
+    }
+    if (metrics.modulesWithNoConnections.length > 0) {
+      console.log(`⚠️  [Requirements] ${metrics.modulesWithNoConnections.length} modules with no connections: ${metrics.modulesWithNoConnections.join(', ')}`);
+    }
+    if (metrics.keyModulesMissingOrOrphaned.length > 0) {
+      console.log(`⚠️  [Requirements] ${metrics.keyModulesMissingOrOrphaned.length} key modules orphaned: ${metrics.keyModulesMissingOrOrphaned.join(', ')}`);
+    }
+    if (metrics.suspiciousClientEdges.length > 0) {
+      console.log(`⚠️  [Requirements] ${metrics.suspiciousClientEdges.length} suspicious client connections detected`);
+    }
 
     // 3) Decide if refinement is needed
     let finalSummary = baseSummary;
     let wasRefined = false;
 
     if (this.needsRefinement(metrics)) {
+      console.log("🔄 [Requirements Refinement] Issues detected, refining with gpt-4o");
       const transcript = this.buildTranscript(history);
       finalSummary = await this.refineRequirements(transcript, baseSummary, metrics);
       wasRefined = true;
+      
+      // Re-analyze to show improvement
+      const refinedMetrics = this.docs.analyzeMermaidRelationships(finalSummary);
+      const issuesFixed = (
+        (metrics.actorsWithNoConnections.length - refinedMetrics.actorsWithNoConnections.length) +
+        (metrics.modulesWithNoConnections.length - refinedMetrics.modulesWithNoConnections.length) +
+        (metrics.keyModulesMissingOrOrphaned.length - refinedMetrics.keyModulesMissingOrOrphaned.length)
+      );
+      console.log(`✅ [Requirements Refinement] Complete. Fixed ${issuesFixed} relationship issues`);
+    } else {
+      console.log("✅ [Requirements Extraction] No issues detected, using gpt-4o-mini result");
     }
 
     // 4) Generate final documents

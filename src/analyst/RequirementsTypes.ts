@@ -60,6 +60,7 @@ export interface RequirementsSummary {
   risksAndConstraints: RiskOrConstraint[];
   openQuestions: string[];
   uploadedDocuments: UploadedDocument[];
+  workflowDiagram: string;
 }
 
 export interface AcceptanceCriterion {

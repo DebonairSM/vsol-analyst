@@ -56,6 +56,7 @@ model Attachment {
   storedPath String
   fileType   String
   mimeType   String
+  parsedData Json?
   sessionId  String
   session    ChatSession @relation(fields: [sessionId], references: [id])
   createdAt  DateTime    @default(now())

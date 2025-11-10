@@ -1483,5 +1483,242 @@ window.addEventListener('popstate', () => {
     }
 });
 
+// Seed Data Generation Functions
+let spreadsheetAttachments = [];
+let selectedSpreadsheetData = null;
+
+async function showSeedDataModal() {
+    if (!currentProject) return;
+    
+    const modal = document.getElementById('seed-data-modal');
+    const loadingDiv = document.getElementById('seed-data-loading');
+    const contentDiv = document.getElementById('seed-data-content');
+    const spreadsheetSelect = document.getElementById('spreadsheet-select');
+    const detailsDiv = document.getElementById('spreadsheet-details');
+    
+    // Show modal with loading state
+    loadingDiv.style.display = 'block';
+    contentDiv.style.display = 'none';
+    modal.classList.add('visible');
+    
+    try {
+        // Fetch project details to get spreadsheet attachments
+        const response = await fetch(`/api/projects/${currentProject.id}`);
+        if (!response.ok) throw new Error('Failed to fetch project');
+        
+        const data = await response.json();
+        const project = data.project;
+        
+        // Collect spreadsheet attachments from all sessions
+        spreadsheetAttachments = [];
+        if (project.sessions && project.sessions.length > 0) {
+            project.sessions.forEach(session => {
+                if (session.attachments) {
+                    session.attachments.forEach(attachment => {
+                        if (attachment.fileType === 'spreadsheet') {
+                            spreadsheetAttachments.push(attachment);
+                        }
+                    });
+                }
+            });
+        }
+        
+        // Populate the dropdown
+        spreadsheetSelect.innerHTML = '<option value="">-- Choose a spreadsheet --</option>';
+        spreadsheetAttachments.forEach(attachment => {
+            const option = document.createElement('option');
+            option.value = attachment.id;
+            option.textContent = `${attachment.filename} (${new Date(attachment.createdAt).toLocaleDateString()})`;
+            spreadsheetSelect.appendChild(option);
+        });
+        
+        // Reset selection
+        detailsDiv.style.display = 'none';
+        selectedSpreadsheetData = null;
+        
+        // Show content
+        loadingDiv.style.display = 'none';
+        contentDiv.style.display = 'block';
+        
+        if (spreadsheetAttachments.length === 0) {
+            spreadsheetSelect.innerHTML = '<option value="">No spreadsheets found in this project</option>';
+            spreadsheetSelect.disabled = true;
+        } else {
+            spreadsheetSelect.disabled = false;
+        }
+    } catch (error) {
+        console.error('Error loading spreadsheet list:', error);
+        alert('Failed to load spreadsheets. Please try again.');
+        hideSeedDataModal();
+    }
+}
+
+function hideSeedDataModal() {
+    const modal = document.getElementById('seed-data-modal');
+    modal.classList.remove('visible');
+    selectedSpreadsheetData = null;
+}
+
+// Handle spreadsheet selection
+document.addEventListener('DOMContentLoaded', () => {
+    const spreadsheetSelect = document.getElementById('spreadsheet-select');
+    if (spreadsheetSelect) {
+        spreadsheetSelect.addEventListener('change', async (e) => {
+            const attachmentId = e.target.value;
+            const detailsDiv = document.getElementById('spreadsheet-details');
+            const previewDiv = document.getElementById('spreadsheet-preview');
+            
+            if (!attachmentId) {
+                detailsDiv.style.display = 'none';
+                selectedSpreadsheetData = null;
+                return;
+            }
+            
+            try {
+                // Fetch the spreadsheet data
+                const response = await fetch(`/analyst/get-spreadsheet-data/${attachmentId}`);
+                if (!response.ok) throw new Error('Failed to fetch spreadsheet data');
+                
+                const data = await response.json();
+                selectedSpreadsheetData = data;
+                
+                // Generate preview
+                let preview = `Filename: ${data.filename}\n`;
+                preview += `Sheets: ${Object.keys(data.parsedData || {}).length}\n\n`;
+                
+                // Show first few rows of each sheet
+                if (data.parsedData) {
+                    Object.keys(data.parsedData).forEach(sheetName => {
+                        const sheetData = data.parsedData[sheetName];
+                        preview += `--- ${sheetName} ---\n`;
+                        preview += `Rows: ${sheetData.length}\n`;
+                        
+                        if (sheetData.length > 0) {
+                            preview += `\nFirst 3 rows:\n`;
+                            sheetData.slice(0, 3).forEach((row, idx) => {
+                                preview += `${idx + 1}: ${JSON.stringify(row)}\n`;
+                            });
+                        }
+                        preview += `\n`;
+                    });
+                }
+                
+                previewDiv.textContent = preview;
+                detailsDiv.style.display = 'block';
+            } catch (error) {
+                console.error('Error loading spreadsheet data:', error);
+                alert('Failed to load spreadsheet data. Please try again.');
+            }
+        });
+    }
+});
+
+function exportAsJSON() {
+    if (!selectedSpreadsheetData) return;
+    
+    const json = JSON.stringify(selectedSpreadsheetData.parsedData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedSpreadsheetData.filename.replace(/\.[^/.]+$/, '')}-seed-data.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function exportAsSQL() {
+    if (!selectedSpreadsheetData) return;
+    
+    let sql = '-- Seed Data SQL\n';
+    sql += `-- Generated from: ${selectedSpreadsheetData.filename}\n`;
+    sql += `-- Date: ${new Date().toISOString()}\n\n`;
+    
+    // Generate SQL INSERT statements for each sheet
+    Object.keys(selectedSpreadsheetData.parsedData).forEach(sheetName => {
+        const sheetData = selectedSpreadsheetData.parsedData[sheetName];
+        
+        if (sheetData.length === 0) return;
+        
+        // Sanitize table name
+        const tableName = sheetName.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+        
+        sql += `-- Table: ${tableName}\n`;
+        
+        // Assume first row is headers
+        const headers = sheetData[0];
+        const dataRows = sheetData.slice(1);
+        
+        if (headers && headers.length > 0 && dataRows.length > 0) {
+            // Generate column names
+            const columns = headers.map((h, idx) => 
+                h ? String(h).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase() : `column_${idx + 1}`
+            );
+            
+            dataRows.forEach(row => {
+                const values = row.map(val => {
+                    if (val === null || val === undefined || val === '') return 'NULL';
+                    if (typeof val === 'number') return val;
+                    // Escape single quotes in strings
+                    return `'${String(val).replace(/'/g, "''")}'`;
+                });
+                
+                sql += `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${values.join(', ')});\n`;
+            });
+            
+            sql += '\n';
+        }
+    });
+    
+    const blob = new Blob([sql], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedSpreadsheetData.filename.replace(/\.[^/.]+$/, '')}-seed-data.sql`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function exportAsCSV() {
+    if (!selectedSpreadsheetData) return;
+    
+    // Create a CSV file for each sheet
+    Object.keys(selectedSpreadsheetData.parsedData).forEach(sheetName => {
+        const sheetData = selectedSpreadsheetData.parsedData[sheetName];
+        
+        if (sheetData.length === 0) return;
+        
+        // Convert to CSV
+        let csv = '';
+        sheetData.forEach(row => {
+            const csvRow = row.map(cell => {
+                if (cell === null || cell === undefined) return '';
+                const cellStr = String(cell);
+                // Escape quotes and wrap in quotes if contains comma, quote, or newline
+                if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                    return `"${cellStr.replace(/"/g, '""')}"`;
+                }
+                return cellStr;
+            });
+            csv += csvRow.join(',') + '\n';
+        });
+        
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const sanitizedSheetName = sheetName.replace(/[^a-zA-Z0-9_]/g, '_');
+        a.download = `${selectedSpreadsheetData.filename.replace(/\.[^/.]+$/, '')}-${sanitizedSheetName}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+}
+
+// Close seed data modal when clicking outside
+document.getElementById('seed-data-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'seed-data-modal') {
+        hideSeedDataModal();
+    }
+});
+
 // Initialize on page load
 init();

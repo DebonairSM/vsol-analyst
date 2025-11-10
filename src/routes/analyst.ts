@@ -9,6 +9,7 @@ import { RequirementsExtractor } from "../analyst/RequirementsExtractor";
 import { DocumentGenerator } from "../analyst/DocumentGenerator";
 import { StoryGenerator } from "../analyst/StoryGenerator";
 import { RequirementsRefinementPipeline } from "../analyst/RequirementsRefinementPipeline";
+import { UserStoryRefinementPipeline } from "../analyst/UserStoryRefinementPipeline";
 import { SYSTEM_PROMPT_ANALYST, SYSTEM_PROMPT_POLISHER } from "../analyst/prompts";
 import { ChatMessage } from "../llm/LLMProvider";
 
@@ -26,6 +27,12 @@ const refinementPipeline = new RequirementsRefinementPipeline(
   llmFull,
   extractor,
   docs
+);
+const storyRefinementPipeline = new UserStoryRefinementPipeline(
+  llmMini,
+  llmFull,
+  storyGen,
+  (stories) => docs.generateUserStoriesMarkdown(stories)
 );
 
 // Configure multer for file uploads
@@ -287,18 +294,22 @@ router.post("/generate-stories", requireAuth, async (req, res) => {
       resolveAttachment
     );
 
-    // Then generate user stories from the requirements
-    const userStories = await storyGen.generateFromRequirements(requirements);
-    const markdown = docs.generateUserStoriesMarkdown(userStories);
+    // Then generate user stories with refinement pipeline
+    const result = await storyRefinementPipeline.generateWithRefinement(requirements);
 
-    res.json({ userStories, markdown });
+    res.json({ 
+      userStories: result.userStories, 
+      markdown: result.markdown,
+      wasRefined: result.wasRefined,
+      metrics: result.metrics,
+    });
   } catch (error) {
     console.error("Error generating user stories:", error);
     res.status(500).json({ error: "User story generation failed" });
   }
 });
 
-// Generate user stories from cached requirements (optimized)
+// Generate user stories from cached requirements (optimized) with refinement
 router.post("/generate-stories-from-requirements", requireAuth, async (req, res) => {
   try {
     const { requirements } = req.body;
@@ -307,11 +318,15 @@ router.post("/generate-stories-from-requirements", requireAuth, async (req, res)
       return res.status(400).json({ error: "requirements object required" });
     }
 
-    // Generate user stories directly from the provided requirements
-    const userStories = await storyGen.generateFromRequirements(requirements);
-    const markdown = docs.generateUserStoriesMarkdown(userStories);
+    // Use the refinement pipeline
+    const result = await storyRefinementPipeline.generateWithRefinement(requirements);
 
-    res.json({ userStories, markdown });
+    res.json({ 
+      userStories: result.userStories, 
+      markdown: result.markdown,
+      wasRefined: result.wasRefined,
+      metrics: result.metrics,
+    });
   } catch (error) {
     console.error("Error generating user stories:", error);
     res.status(500).json({ error: "User story generation failed" });
@@ -434,6 +449,26 @@ router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), asyn
 
     result.summary = summaryParts.join("\n");
 
+    // Convert undefined values to null for JSON storage (Prisma requirement)
+    const convertUndefinedToNull = (obj: any): any => {
+      if (obj === undefined) {
+        return null;
+      }
+      if (Array.isArray(obj)) {
+        return obj.map(convertUndefinedToNull);
+      }
+      if (obj !== null && typeof obj === 'object') {
+        const converted: any = {};
+        for (const key in obj) {
+          converted[key] = convertUndefinedToNull(obj[key]);
+        }
+        return converted;
+      }
+      return obj;
+    };
+    
+    const cleanedSheets = convertUndefinedToNull(result.sheets);
+
     // Get or create chat session for this project
     let chatSession = await prisma.chatSession.findFirst({
       where: { projectId },
@@ -459,6 +494,7 @@ router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), asyn
         storedPath: req.file.path,
         fileType: "spreadsheet",
         mimeType: req.file.mimetype,
+        parsedData: cleanedSheets,
         sessionId: chatSession.id,
       },
     });
@@ -515,6 +551,55 @@ router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), asyn
     }
 
     res.status(500).json({ error: "Failed to process Excel file" });
+  }
+});
+
+// Get spreadsheet data endpoint
+router.get("/get-spreadsheet-data/:attachmentId", requireAuth, async (req, res) => {
+  try {
+    const user = req.user as any;
+    const { attachmentId } = req.params;
+
+    // Get attachment with session info to verify ownership
+    const attachment = await prisma.attachment.findUnique({
+      where: { id: attachmentId },
+      include: {
+        session: {
+          include: {
+            project: {
+              include: {
+                company: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!attachment) {
+      return res.status(404).json({ error: "Attachment not found" });
+    }
+
+    // Verify user owns the project
+    if (attachment.session.project.company.userId !== user.id) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Verify this is a spreadsheet
+    if (attachment.fileType !== "spreadsheet") {
+      return res.status(400).json({ error: "This attachment is not a spreadsheet" });
+    }
+
+    // Return the parsed data
+    res.json({
+      id: attachment.id,
+      filename: attachment.filename,
+      parsedData: attachment.parsedData,
+      createdAt: attachment.createdAt,
+    });
+  } catch (error) {
+    console.error("Error retrieving spreadsheet data:", error);
+    res.status(500).json({ error: "Failed to retrieve spreadsheet data" });
   }
 });
 

@@ -52,11 +52,12 @@ Desktop.ini
 # Test files
 test-*.xlsx
 test-*.csv
+test-*.md
 
-# Uploaded files (keep folder structure)
-uploads/**/*
-!uploads/**/.gitkeep
-!uploads/images/
-!uploads/spreadsheets/
+# Uploaded files
+uploads/images/*
+uploads/spreadsheets/*
+!uploads/images/.gitkeep
+!uploads/spreadsheets/.gitkeep
 
 /src/generated/prisma

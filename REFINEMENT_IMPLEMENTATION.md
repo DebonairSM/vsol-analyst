@@ -1,12 +1,18 @@
-# Requirements Refinement Layer Implementation
+# Refinement Layer Implementation
 
 ## Overview
 
-This implementation adds a two-pass requirements extraction pipeline that uses a fast, cheap model (gpt-4o-mini) for initial extraction, then optionally refines with a larger model (gpt-4o) only when structural issues are detected in the generated workflow diagram.
+This implementation adds two-pass pipelines with automatic quality-based refinement for:
+1. **Requirements Extraction** - Uses gpt-4o-mini, refines with gpt-4o when diagram relationship issues are detected
+2. **User Story Generation** - Uses gpt-4o-mini, refines with gpt-4o when story quality issues are detected
+
+Both pipelines include comprehensive logging to track when and why the larger model is used.
 
 ## Architecture
 
 ### Components Created
+
+## Requirements Refinement Components
 
 1. **MermaidMetrics Interface** (`src/analyst/DocumentGenerator.ts`)
    - Defines diagnostic metrics for relationship quality
@@ -43,8 +49,51 @@ This implementation adds a two-pass requirements extraction pipeline that uses a
      - Generated markdown and Mermaid
      - `wasRefined` flag
      - Metrics for transparency
+   - **Includes comprehensive logging** for model usage and issue detection
 
-### Refinement Decision Logic
+## User Story Refinement Components
+
+5. **UserStoryMetrics Interface** (`src/analyst/StoryGenerator.ts`)
+   - Defines diagnostic metrics for story quality
+   - Fields:
+     - `storiesWithoutAcceptanceCriteria`: Stories missing AC
+     - `storiesWithVagueActions`: Stories with generic verbs
+     - `storiesWithoutBenefits`: Stories missing "so that" benefits
+     - `epicsWithFewStories`: Thin epics (only 1 story)
+     - `totalQualityScore`: 0-100 score, higher is better
+
+6. **analyzeStoryQuality Method** (`src/analyst/StoryGenerator.ts`)
+   - Analyzes UserStoriesOutput quality
+   - Detects:
+     - Missing or empty acceptance criteria
+     - Vague actions (manage, handle, use, access)
+     - Missing or too-short benefits
+     - Epics with insufficient stories
+   - Calculates quality score with weighted deductions
+
+7. **SYSTEM_PROMPT_STORY_REFINER** (`src/analyst/prompts.ts`)
+   - System prompt for story refinement model
+   - Focuses on:
+     - Adding specific, testable acceptance criteria
+     - Replacing vague actions with specific verbs
+     - Ensuring clear business value in benefits
+     - Consolidating or expanding thin epics
+   - Conservative: only fixes identified issues
+
+8. **UserStoryRefinementPipeline** (`src/analyst/UserStoryRefinementPipeline.ts`)
+   - Orchestrates two-pass story generation
+   - Methods:
+     - `generateWithRefinement()`: Main entry point
+     - `needsRefinement()`: Decision logic based on quality score
+     - `refineStories()`: Calls larger model with metrics
+   - Returns:
+     - Final UserStoriesOutput
+     - Generated markdown
+     - `wasRefined` flag
+     - Quality metrics
+   - **Includes comprehensive logging** for quality analysis and refinement
+
+### Requirements Refinement Decision Logic
 
 Refinement is triggered if any of these conditions are met:
 
@@ -52,15 +101,35 @@ Refinement is triggered if any of these conditions are met:
 2. Any key module (Status Tracking, Reporting, Dashboard, Invoice Portal) is orphaned
 3. Client/customer actors are connected to non-client-facing modules
 
+### User Story Refinement Decision Logic
+
+Refinement is triggered if any of these conditions are met:
+
+1. Quality score is below 70/100
+2. Any stories are missing acceptance criteria
+3. Three or more stories have vague actions
+
+Quality score deductions:
+- 15 points per story without acceptance criteria
+- 10 points per story with vague action
+- 10 points per story without sufficient benefit
+- 5 points per thin epic (only 1 story)
+
 ### Integration
 
 **Route Changes** (`src/routes/analyst.ts`):
 - Instantiate both `llmMini` (gpt-4o-mini) and `llmFull` (gpt-4o)
-- Create `RequirementsRefinementPipeline` instance
+- Create `RequirementsRefinementPipeline` and `UserStoryRefinementPipeline` instances
 - Updated `/analyst/extract` endpoint to:
   - Use `refinementPipeline.extractWithRefinement()`
   - Return additional fields: `wasRefined`, `metrics`
-- All other endpoints use `llmMini` for cost efficiency
+- Updated `/analyst/generate-stories` endpoint to:
+  - Use `storyRefinementPipeline.generateWithRefinement()`
+  - Return additional fields: `wasRefined`, `metrics`
+- Updated `/analyst/generate-stories-from-requirements` endpoint to:
+  - Use `storyRefinementPipeline.generateWithRefinement()`
+  - Return additional fields: `wasRefined`, `metrics`
+- Chat and polish endpoints use `llmMini` exclusively
 
 ## Testing
 
@@ -85,37 +154,106 @@ Refinement is triggered if any of these conditions are met:
    - Tests multiple tool integrations
    - Validates real-world scenario output syntax
 
+4. `tests/UserStoryRefinement.test.ts` (5 tests):
+   - Detects stories without acceptance criteria
+   - Detects vague actions (manage, handle, use, access)
+   - Detects missing or weak benefits
+   - Detects epics with few stories
+   - Validates quality score calculations
+
 **Test Results**:
-- All 22 tests pass
+- All 27 tests pass
 - No regressions introduced
-- Mermaid output is now properly wrapped and can be pasted directly into markdown files
+- Mermaid output is properly wrapped and markdown-ready
+- User story quality detection works correctly
 
 ## Cost/Performance Characteristics
 
-**Without Issues** (typical case):
-- Single gpt-4o-mini call for extraction
-- Fast and cheap (current behavior)
+### Requirements Extraction
 
-**With Issues** (refinement needed):
+**Without Issues** (typical case):
+- Single gpt-4o-mini call
+- Fast and cheap
+
+**With Issues** (refinement triggered):
 - First pass: gpt-4o-mini extraction
 - Second pass: gpt-4o refinement with diagnostics
 - Slower and more expensive, but only when necessary
 
+### User Story Generation
+
+**Without Issues** (typical case):
+- Single gpt-4o-mini call
+- Quality score >= 70
+- Fast and cheap
+
+**With Issues** (refinement triggered):
+- First pass: gpt-4o-mini generation
+- Second pass: gpt-4o refinement with quality metrics
+- Triggered by: missing AC, vague actions, or low quality score
+- Slower and more expensive, but improves story quality
+
+## Logging Output
+
+All refinement pipelines now include emoji-prefixed console logging:
+
+**Requirements Extraction**:
+```
+🚀 [Requirements Extraction] Starting with gpt-4o-mini
+📊 [Requirements Analysis] Diagram relationship analysis complete
+⚠️  [Requirements] 2 actors with no connections: Client, Wife of Owner
+⚠️  [Requirements] 1 key modules orphaned: Workflow Visualization Dashboard
+🔄 [Requirements Refinement] Issues detected, refining with gpt-4o
+✅ [Requirements Refinement] Complete. Fixed 3 relationship issues
+```
+
+**User Story Generation**:
+```
+🚀 [Story Generation] Starting with gpt-4o-mini
+📊 [Story Quality] Score: 55/100
+⚠️  [Story Quality] 5 stories missing acceptance criteria
+⚠️  [Story Quality] 3 stories with vague actions
+🔄 [Story Refinement] Quality issues detected, refining with gpt-4o
+✅ [Story Refinement] Complete. New score: 90/100
+```
+
+**No Issues** (mini only):
+```
+🚀 [Requirements Extraction] Starting with gpt-4o-mini
+📊 [Requirements Analysis] Diagram relationship analysis complete
+✅ [Requirements Extraction] No issues detected, using gpt-4o-mini result
+```
+
 ## Usage
 
-The refinement layer is transparent to clients. The `/analyst/extract` endpoint now returns:
+### Requirements Endpoint
+
+The `/analyst/extract` endpoint now returns:
 
 ```typescript
 {
   requirements: RequirementsSummary,
   markdown: string,
   mermaid: string,
-  wasRefined: boolean,    // NEW: indicates if refinement was used
-  metrics: MermaidMetrics // NEW: diagnostic information
+  wasRefined: boolean,    // indicates if gpt-4o was used
+  metrics: MermaidMetrics // diagnostic information
 }
 ```
 
-Frontend can optionally display refinement status or metrics for debugging.
+### User Story Endpoints
+
+Both `/analyst/generate-stories` and `/analyst/generate-stories-from-requirements` now return:
+
+```typescript
+{
+  userStories: UserStoriesOutput,
+  markdown: string,
+  wasRefined: boolean,      // indicates if gpt-4o was used
+  metrics: UserStoryMetrics // quality diagnostic information
+}
+```
+
+Frontend can display refinement status and metrics for transparency.
 
 ## Bug Fixes Applied
 
