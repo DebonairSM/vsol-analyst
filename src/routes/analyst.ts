@@ -327,10 +327,10 @@ router.post("/extract-stream", requireAuth, async (req, res) => {
 
     try {
       sendProgress(10, "Sunny is reviewing your conversation...");
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 2500));
       
       sendProgress(20, "Sunny is preparing to extract requirements...");
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 2500));
       
       const result = await refinementPipeline.extractWithRefinement(
         history,
@@ -490,10 +490,10 @@ router.post("/generate-stories-stream", requireAuth, async (req, res) => {
 
     try {
       sendProgress(10, "Sunny is reviewing requirements...");
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 2500));
       
       sendProgress(20, "Sunny is preparing to generate stories...");
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 2500));
       
       const result = await storyRefinementPipeline.generateWithRefinement(
         requirements,
@@ -584,13 +584,13 @@ router.post("/generate-flowchart-stream", requireAuth, async (req, res) => {
 
      try {
        sendProgress(10, "Sunny is analyzing your system architecture...");
-       await new Promise(resolve => setTimeout(resolve, 1500));
+       await new Promise(resolve => setTimeout(resolve, 2500));
        
        sendProgress(20, "Sunny is preparing to map workflows...");
-       await new Promise(resolve => setTimeout(resolve, 1500));
+       await new Promise(resolve => setTimeout(resolve, 2500));
        
        sendProgress(30, "Sunny is mapping actor interactions...");
-       await new Promise(resolve => setTimeout(resolve, 1000));
+       await new Promise(resolve => setTimeout(resolve, 1500));
        
        sendProgress(40, "Sunny is identifying workflow patterns...");
       
