@@ -64,19 +64,31 @@ Refinement is triggered if any of these conditions are met:
 
 ## Testing
 
-**New Test Suite** (`tests/RequirementsRefinementPipeline.test.ts`):
-- 11 comprehensive tests covering:
-  - Detection of actors with no connections
-  - Detection of orphaned modules
-  - Detection of suspicious client edges
-  - Detection of orphaned key modules
-  - Real-world consulting scenarios (both poor and good extractions)
-  - Edge cases (empty actors, empty modules)
+**Test Suites**:
+
+1. `tests/RequirementsRefinementPipeline.test.ts` (11 tests):
+   - Detection of actors with no connections
+   - Detection of orphaned modules
+   - Detection of suspicious client edges
+   - Detection of orphaned key modules
+   - Real-world consulting scenarios (both poor and good extractions)
+   - Edge cases (empty actors, empty modules)
+
+2. `tests/DocumentGenerator.mermaid.test.ts` (6 tests):
+   - Existing relationship inference tests
+   - Updated to handle mermaid wrapper format
+
+3. `tests/MermaidOutputValidation.test.ts` (5 tests):
+   - Validates mermaid code block wrapper format
+   - Validates blank line separation between actor and tool edges
+   - Ensures no consecutive comment parsing errors
+   - Tests multiple tool integrations
+   - Validates real-world scenario output syntax
 
 **Test Results**:
-- All 11 new tests pass
-- All 6 existing Mermaid tests still pass
+- All 22 tests pass
 - No regressions introduced
+- Mermaid output is now properly wrapped and can be pasted directly into markdown files
 
 ## Cost/Performance Characteristics
 
@@ -104,6 +116,31 @@ The refinement layer is transparent to clients. The `/analyst/extract` endpoint 
 ```
 
 Frontend can optionally display refinement status or metrics for debugging.
+
+## Bug Fixes Applied
+
+### Issue: Mermaid Parse Error
+**Problem**: The generated Mermaid diagrams caused parse errors at the boundary between actor edges and tool edges:
+```
+Parse error on line 35: ...workflow_visualization_dashboard
+Parse error on line 36: ...time_doctor --> integration...%% integration
+Expecting 'SEMI', 'NEWLINE', 'EOF', got 'NODE_STRING'
+```
+
+**Root Cause**: Two issues were causing the parse error:
+1. Tool integration edges were being added directly to the lines array immediately after actor edges
+2. Missing blank line separator between different edge groups confused the Mermaid parser
+
+**Solution**: 
+1. Collect tool edges in a separate array before adding to output
+2. Add blank line separator between actor edges and tool edges (when both exist)
+3. Wrap all Mermaid output in ` ```mermaid ` code blocks for direct markdown pasting
+
+**Validation**:
+- Added `tests/MermaidOutputValidation.test.ts` with 5 syntax validation tests
+- Specific test validates blank line separation between edge groups
+- All 22 tests pass (11 refinement + 6 mermaid + 5 validation)
+- Output is now valid Mermaid syntax and markdown-ready
 
 ## Future Enhancements
 

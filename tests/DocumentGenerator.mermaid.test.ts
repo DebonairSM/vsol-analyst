@@ -4,7 +4,9 @@ import { RequirementsSummary, Actor, CandidateModule } from "../src/analyst/Requ
 // Helper to parse edges from Mermaid output
 function parseEdges(mermaidOutput: string): Set<string> {
   const edges = new Set<string>();
-  const lines = mermaidOutput.split('\n');
+  // Strip mermaid wrapper if present
+  const cleanOutput = mermaidOutput.replace(/^```mermaid\n/, '').replace(/\n```$/, '');
+  const lines = cleanOutput.split('\n');
   
   for (const line of lines) {
     const match = line.match(/^\s*(\w+)\s*-->\s*(\w+)/);
@@ -287,8 +289,9 @@ describe("DocumentGenerator.generateMermaidFlow", () => {
       // Negative assertions - client should NOT have spurious fallback
       expect(edges.has(`${clientId} --> ${remindersId}`)).toBe(false);
       
-      // Verify Status Tracking node exists
-      expect(output.includes('status_tracking')).toBe(true);
+      // Verify Status Tracking node exists (strip wrapper for checking)
+      const cleanOutput = output.replace(/^```mermaid\n/, '').replace(/\n```$/, '');
+      expect(cleanOutput.includes('status_tracking')).toBe(true);
     });
   });
 });

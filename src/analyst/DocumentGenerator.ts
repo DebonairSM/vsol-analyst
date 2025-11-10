@@ -434,7 +434,7 @@ export class DocumentGenerator {
           lines.push(`  ${actorId} --> ${modId}`);
         }
       }
-      return lines.join("\n");
+      return "```mermaid\n" + lines.join("\n") + "\n```";
     }
 
     // Continue with intelligent inference below...
@@ -454,7 +454,7 @@ export class DocumentGenerator {
     // Handle partial extraction gracefully
     if (!hasActors && !hasModules) {
       lines.push("  NoData[No actors or modules identified]");
-      return lines.join("\n");
+      return "```mermaid\n" + lines.join("\n") + "\n```";
     }
 
     if (!hasActors) {
@@ -473,7 +473,7 @@ export class DocumentGenerator {
           lines.push(`  ${id}["${actor.name}"]`);
         }
       }
-      return lines.join("\n");
+      return "```mermaid\n" + lines.join("\n") + "\n```";
     }
 
     // Sort for deterministic output
@@ -593,6 +593,7 @@ export class DocumentGenerator {
     lines.push(...edges);
 
     // Tool edges (consistent: Tool --> Module)
+    const toolEdges: string[] = [];
     for (const tool of tools) {
       if (!toolIdMap.has(tool.name)) continue;
       
@@ -605,9 +606,17 @@ export class DocumentGenerator {
         
         if (hasTool) {
           const modId = moduleIdMap.get(mod.name)!;
-          lines.push(`  ${toolId} --> ${modId}   %% integration`);
+          toolEdges.push(`  ${toolId} --> ${modId}   %% integration`);
         }
       }
+    }
+    
+    // Add tool edges with blank line separator if we have both types of edges
+    if (toolEdges.length > 0) {
+      if (edges.length > 0) {
+        lines.push(""); // Blank line separator between actor and tool edges
+      }
+      lines.push(...toolEdges);
     }
 
     // Debug output with legend
@@ -620,7 +629,7 @@ export class DocumentGenerator {
       }
     }
 
-    return lines.join("\n");
+    return "```mermaid\n" + lines.join("\n") + "\n```";
   }
 
   generateUserStoriesMarkdown(userStories: UserStoriesOutput): string {
