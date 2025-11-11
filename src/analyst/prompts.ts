@@ -422,9 +422,8 @@ interface UserStory {
   benefit: string;               // Why they want it (e.g., "I can choose a convenient time without calling the shop")
   acceptanceCriteria: AcceptanceCriterion[];  // 3-5 specific, testable criteria
   priority: "must-have" | "should-have" | "nice-to-have";  // Aligned with module priority
-  effort: "small" | "medium" | "large";  // Small: 1-3 points, Medium: 3-5 points, Large: 8+ points
-  storyPoints?: number;          // Optional: Fibonacci estimate (1,2,3,5,8,13)
-  sprint?: number;               // Optional: Suggested sprint number (1-5)
+  effort: "small" | "medium" | "large";  // Small: simple feature, Medium: moderate complexity, Large: complex feature
+  team?: string;                 // Team assigned to the story (default: "Team Sunny")
 }
 
 interface Epic {
@@ -472,7 +471,7 @@ Each user story should follow the structure:
 - action: what the actor wants to do, tied to a specific module (e.g., "submit my invoices through the Invoice Submission Portal").
 - benefit: why they want it (business value).
 - priority: consistent with module priority when possible.
-- effort, storyPoints, sprint: optional fields you may fill reasonably if required by the schema.
+- effort: right-sized estimate based on complexity (small, medium, large).
 
 When writing stories:
 
@@ -520,16 +519,10 @@ Align stories with:
    - "should-have": Important features from should-have modules or secondary goals
    - "nice-to-have": Enhancement features from nice-to-have modules
 
-6. EFFORT ESTIMATION:
-   - "small": Simple UI, basic CRUD, minimal logic (1-3 story points)
-   - "medium": Moderate complexity, some integration, business logic (3-5 story points)
-   - "large": Complex features, multiple integrations, significant logic (8+ story points)
-
-7. SPRINT PLANNING (if provided):
-   - Sprint 1: Must-have stories with highest business value
-   - Sprint 2: Remaining must-haves and critical should-haves
-   - Sprint 3+: Should-haves and nice-to-haves
-   - Assign story points using Fibonacci: 1, 2, 3, 5, 8, 13
+6. EFFORT ESTIMATION (Right-Sizing):
+   - "small": Simple UI, basic CRUD, minimal logic
+   - "medium": Moderate complexity, some integration, business logic
+   - "large": Complex features, multiple integrations, significant logic
 
 8. COVERAGE:
    - Ensure each mainActor has at least 2-3 user stories

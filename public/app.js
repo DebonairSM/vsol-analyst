@@ -27,20 +27,28 @@ const loginPage = document.getElementById('login-page');
 const projectsPage = document.getElementById('projects-page');
 const adminPage = document.getElementById('admin-page');
 const chatPage = document.getElementById('chat-page');
+const requirementsPage = document.getElementById('requirements-page');
 const userHeader = document.getElementById('user-header');
 const userName = document.getElementById('user-name');
 const adminBadge = document.getElementById('admin-badge');
 const adminViewBtn = document.getElementById('admin-view-btn');
 const projectsList = document.getElementById('projects-list');
 const projectTitle = document.getElementById('project-title');
+const requirementsProjectTitle = document.getElementById('requirements-project-title');
 const chatContainer = document.getElementById('chat-container');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const polishBtn = document.getElementById('polish-btn');
 const extractBtn = document.getElementById('extract-btn');
+const openRequirementsBtn = document.getElementById('open-requirements-btn');
+const refreshRequirementsChatBtn = document.getElementById('refresh-requirements-chat-btn');
+const requirementsStaleIndicator = document.getElementById('requirements-stale-indicator');
 const voiceBtn = document.getElementById('voice-btn');
 const markdownOutput = document.getElementById('markdown-output');
 const mermaidOutput = document.getElementById('mermaid-output');
+const requirementsMarkdownOutput = document.getElementById('requirements-markdown-output');
+const requirementsMermaidOutput = document.getElementById('requirements-mermaid-output');
+const requirementsFlowchartOutput = document.getElementById('requirements-detailed-flowchart-output');
 const newProjectModal = document.getElementById('new-project-modal');
 const newProjectNameInput = document.getElementById('new-project-name');
 const adminContent = document.getElementById('admin-content');
@@ -76,8 +84,13 @@ async function init() {
             // Handle initial URL routing
             const hash = window.location.hash;
             if (hash.startsWith('#/project/')) {
-                const projectId = hash.replace('#/project/', '');
-                await loadProjectFromUrl(projectId);
+                const parts = hash.split('/');
+                const projectId = parts[2];
+                if (parts[3] === 'requirements') {
+                    await loadRequirementsFromUrl(projectId);
+                } else {
+                    await loadProjectFromUrl(projectId);
+                }
             } else if (hash === '#/admin' && currentUser.isAdmin) {
                 showAdminDashboard();
             } else {
@@ -109,12 +122,30 @@ async function loadProjectFromUrl(projectId) {
     }
 }
 
+// Load requirements page from URL
+async function loadRequirementsFromUrl(projectId) {
+    try {
+        const projectResponse = await fetch(`/api/projects/${projectId}`);
+        if (projectResponse.ok) {
+            const projectData = await projectResponse.json();
+            currentProject = projectData.project;
+            await showRequirementsPage();
+        } else {
+            showProjects();
+        }
+    } catch (error) {
+        console.error('Error loading requirements from URL:', error);
+        showProjects();
+    }
+}
+
 // Show/hide pages
 function showLogin() {
     loginPage.classList.remove('hidden');
     projectsPage.classList.remove('visible');
     adminPage.style.display = 'none';
     chatPage.classList.remove('visible');
+    requirementsPage.classList.remove('visible');
     userHeader.style.display = 'none';
 }
 
@@ -153,6 +184,7 @@ async function showChat(project) {
     projectsPage.classList.remove('visible');
     adminPage.style.display = 'none';
     chatPage.classList.add('visible');
+    requirementsPage.classList.remove('visible');
     
     // Update URL
     if (!isInitialLoad) {
@@ -161,6 +193,117 @@ async function showChat(project) {
     
     // Load existing chat history
     await loadChatHistory(project.id);
+    
+    // Check if requirements exist and update button states
+    await updateRequirementsButtonStates();
+}
+
+async function showRequirementsPage() {
+    if (!currentProject) return;
+    
+    loginPage.classList.add('hidden');
+    projectsPage.classList.remove('visible');
+    adminPage.style.display = 'none';
+    chatPage.classList.remove('visible');
+    requirementsPage.classList.add('visible');
+    userHeader.style.display = 'flex';
+    
+    requirementsProjectTitle.textContent = `${currentProject.name} - Requirements`;
+    
+    // Update URL
+    if (!isInitialLoad) {
+        window.history.pushState({}, '', `#/project/${currentProject.id}/requirements`);
+    }
+    
+    // Load requirements
+    try {
+        const response = await fetch(`/analyst/requirements/${currentProject.id}`);
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Check if markdown/mermaid are empty (legacy requirements need refresh)
+            if (!data.markdown || !data.mermaid) {
+                // Show message and auto-refresh
+                document.getElementById('requirements-loading').style.display = 'block';
+                document.getElementById('requirements-content').style.display = 'none';
+                
+                // Wait a moment then refresh
+                setTimeout(() => {
+                    refreshRequirementsOnPage();
+                }, 100);
+                return;
+            }
+            
+            requirementsMarkdownOutput.value = data.markdown;
+            requirementsMermaidOutput.value = data.mermaid;
+            cachedRequirements = data.requirements;
+            
+            // Load detailed flowchart if it exists
+            if (data.detailedFlowchart) {
+                const flowchartOutput = document.getElementById('requirements-detailed-flowchart-output');
+                const flowchartOutputDiv = document.getElementById('requirements-flowchart-output');
+                const flowchartBtn = document.getElementById('requirements-generate-flowchart-btn');
+                
+                if (flowchartOutput && flowchartOutputDiv && flowchartBtn) {
+                    flowchartOutput.value = data.detailedFlowchart;
+                    flowchartOutputDiv.style.display = 'block';
+                    flowchartBtn.style.display = 'none';
+                }
+            }
+            
+            // Load user stories if they exist
+            if (data.hasUserStories && data.userStoriesMarkdown) {
+                loadExistingUserStories(data.userStoriesMarkdown);
+            }
+            
+            document.getElementById('requirements-content').style.display = 'block';
+            document.getElementById('requirements-loading').style.display = 'none';
+        } else {
+            alert('No requirements found. Please extract requirements first.');
+            returnToChat();
+        }
+    } catch (error) {
+        console.error('Error loading requirements:', error);
+        alert('Failed to load requirements');
+        returnToChat();
+    }
+}
+
+function returnToChat() {
+    if (!currentProject) return;
+    
+    loginPage.classList.add('hidden');
+    projectsPage.classList.remove('visible');
+    adminPage.style.display = 'none';
+    chatPage.classList.add('visible');
+    requirementsPage.classList.remove('visible');
+    userHeader.style.display = 'flex';
+    
+    // Update URL
+    window.history.pushState({}, '', `#/project/${currentProject.id}`);
+}
+
+// Load existing user stories from database
+function loadExistingUserStories(markdown) {
+    const prefix = 'requirements-';
+    const userStoriesTextarea = document.getElementById(prefix + 'user-stories-output');
+    const storiesOutput = document.getElementById(prefix + 'stories-output');
+    const generateBtn = document.getElementById(prefix + 'generate-stories-btn');
+    
+    if (!userStoriesTextarea || !storiesOutput || !generateBtn) {
+        console.error('Required elements not found for loading user stories');
+        return;
+    }
+    
+    // Populate the textarea with the markdown
+    userStoriesTextarea.value = markdown;
+    
+    // Hide generate button and show output
+    generateBtn.style.display = 'none';
+    storiesOutput.style.display = 'block';
+    
+    // Show action buttons
+    showStoriesActionButtons();
 }
 
 // Authentication
@@ -173,6 +316,8 @@ async function logout() {
         await fetch('/auth/logout');
         currentUser = null;
         currentProject = null;
+        // Clear URL hash to prevent routing issues
+        window.history.pushState({}, '', '/');
         showLogin();
     } catch (error) {
         console.error('Error logging out:', error);
@@ -753,6 +898,7 @@ async function performExtraction() {
         const decoder = new TextDecoder();
         let buffer = '';
         let finalData = null;
+        let streamError = null;
         
         while (true) {
             const { done, value } = await reader.read();
@@ -769,7 +915,9 @@ async function performExtraction() {
                         const data = JSON.parse(line.slice(6));
                         
                         if (data.error) {
-                            throw new Error(data.error);
+                            // Store the error to throw after stream completes
+                            streamError = new Error(data.error);
+                            console.error('❌ Server error:', data.error);
                         }
                         
                         if (data.complete) {
@@ -791,9 +939,18 @@ async function performExtraction() {
                         }
                     } catch (e) {
                         console.error('Error parsing SSE data:', e);
+                        // Store parse errors as well
+                        if (!streamError) {
+                            streamError = e;
+                        }
                     }
                 }
             }
+        }
+        
+        // Throw stream error if one occurred
+        if (streamError) {
+            throw streamError;
         }
         
         if (!finalData) {
@@ -823,6 +980,9 @@ async function performExtraction() {
         
         // Switch modal to show results
         showOutputResults();
+        
+        // Update button states to show Open/Refresh instead of Extract
+        await updateRequirementsButtonStates();
     } catch (error) {
         clearLoadingIntervals();
         hideOutputModal();
@@ -834,6 +994,156 @@ async function performExtraction() {
     sendBtn.disabled = false;
     extractBtn.disabled = false;
     voiceBtn.disabled = false;
+}
+
+// Update requirements button states based on whether requirements exist
+async function updateRequirementsButtonStates() {
+    if (!currentProject) return;
+    
+    try {
+        const response = await fetch(`/analyst/requirements/${currentProject.id}`);
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Hide Extract button, show Open and Refresh buttons
+            extractBtn.style.display = 'none';
+            openRequirementsBtn.style.display = 'inline-block';
+            refreshRequirementsChatBtn.style.display = 'inline-block';
+            
+            // Show staleness indicator if requirements are outdated
+            if (data.isStale) {
+                requirementsStaleIndicator.style.display = 'inline';
+            } else {
+                requirementsStaleIndicator.style.display = 'none';
+            }
+            
+            // Cache requirements
+            cachedRequirements = data.requirements;
+        } else {
+            // No requirements exist, show Extract button
+            extractBtn.style.display = 'inline-block';
+            openRequirementsBtn.style.display = 'none';
+            refreshRequirementsChatBtn.style.display = 'none';
+            requirementsStaleIndicator.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error checking requirements:', error);
+        // Default to showing Extract button
+        extractBtn.style.display = 'inline-block';
+        openRequirementsBtn.style.display = 'none';
+        refreshRequirementsChatBtn.style.display = 'none';
+        requirementsStaleIndicator.style.display = 'none';
+    }
+}
+
+// Refresh requirements on the requirements page
+async function refreshRequirementsOnPage() {
+    if (!currentProject) return;
+    
+    // Show loading state
+    document.getElementById('requirements-content').style.display = 'none';
+    document.getElementById('requirements-loading').style.display = 'block';
+    
+    // Reset progress
+    currentProgress = 0;
+    targetProgress = 0;
+    const progressBar = document.getElementById('requirements-progress-bar');
+    const percentageDisplay = document.getElementById('requirements-percentage');
+    if (progressBar && percentageDisplay) {
+        progressBar.style.width = '0%';
+        percentageDisplay.textContent = '0%';
+    }
+    
+    // Start tips rotation
+    startTipsRotation('requirements-tip');
+    
+    try {
+        const endpoint = currentProject.isAdminView 
+            ? `/api/admin/projects/${currentProject.id}/extract`
+            : '/analyst/extract-stream';
+        
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: currentProject.isAdminView ? undefined : JSON.stringify({ projectId: currentProject.id })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Extraction failed');
+        }
+        
+        // Process the streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalData = null;
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        
+                        if (data.error) {
+                            throw new Error(data.error);
+                        }
+                        
+                        if (data.complete) {
+                            finalData = data;
+                        } else if (data.progress !== undefined) {
+                            const statusElement = document.getElementById('requirements-status');
+                            animateProgressTo('requirements-progress-bar', 'requirements-percentage', data.progress);
+                            if (statusElement && data.stage) {
+                                statusElement.textContent = data.stage;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error parsing SSE data:', e);
+                    }
+                }
+            }
+        }
+        
+        if (!finalData) {
+            throw new Error('No final data received');
+        }
+        
+        // Update the displayed requirements
+        requirementsMarkdownOutput.value = finalData.markdown;
+        requirementsMermaidOutput.value = finalData.mermaid;
+        cachedRequirements = finalData.requirements;
+        
+        // Ensure 100% is visible
+        if (progressBar && percentageDisplay) {
+            progressBar.style.width = '100%';
+            percentageDisplay.textContent = '100%';
+            currentProgress = 100;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Clear intervals and show content
+        clearLoadingIntervals();
+        document.getElementById('requirements-loading').style.display = 'none';
+        document.getElementById('requirements-content').style.display = 'block';
+        
+        // Update button states in chat view
+        await updateRequirementsButtonStates();
+    } catch (error) {
+        clearLoadingIntervals();
+        document.getElementById('requirements-loading').style.display = 'none';
+        document.getElementById('requirements-content').style.display = 'block';
+        alert('Failed to refresh requirements. Please try again.');
+        console.error('Error:', error);
+    }
 }
 
 function copyMarkdown(event) {
@@ -892,35 +1202,154 @@ function downloadMermaid() {
     URL.revokeObjectURL(url);
 }
 
+// Requirements page copy/download functions
+function copyRequirementsMarkdown(event) {
+    const content = requirementsMarkdownOutput.value;
+    navigator.clipboard.writeText(content).then(() => {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy to clipboard');
+    });
+}
+
+function copyRequirementsMermaid(event) {
+    const content = requirementsMermaidOutput.value;
+    navigator.clipboard.writeText(content).then(() => {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy to clipboard');
+    });
+}
+
+function copyRequirementsFlowchart(event) {
+    const content = requirementsFlowchartOutput.value;
+    navigator.clipboard.writeText(content).then(() => {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy to clipboard');
+    });
+}
+
+function downloadRequirementsMarkdown() {
+    const content = requirementsMarkdownOutput.value;
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentProject.name}-requirements.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function downloadRequirementsMermaid() {
+    const content = requirementsMermaidOutput.value;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentProject.name}-workflow.mmd`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 // User Stories Generation
+let isGeneratingStories = false; // Flag to prevent concurrent story generation
+
 async function generateUserStories() {
     if (!currentProject) return;
     
-    const generateBtn = document.getElementById('generate-stories-btn');
-    const storiesLoading = document.getElementById('stories-loading');
-    const storiesOutput = document.getElementById('stories-output');
-    const userStoriesTextarea = document.getElementById('user-stories-output');
+    // Prevent concurrent requests
+    if (isGeneratingStories) {
+        console.log('⚠️ Story generation already in progress, ignoring click');
+        return;
+    }
+    
+    isGeneratingStories = true;
+    
+    // Detect if we're on requirements page or in modal
+    const isRequirementsPage = requirementsPage && requirementsPage.classList.contains('visible');
+    const prefix = isRequirementsPage ? 'requirements-' : '';
+    
+    console.log('🔍 Debug: isRequirementsPage =', isRequirementsPage, ', prefix =', prefix);
+    
+    const generateBtn = document.getElementById(prefix + 'generate-stories-btn');
+    const storiesLoading = document.getElementById(prefix + 'stories-loading');
+    const storiesOutput = document.getElementById(prefix + 'stories-output');
+    const userStoriesTextarea = document.getElementById(prefix + 'user-stories-output');
+    
+    console.log('🔍 Debug: Elements found:', {
+        generateBtn: !!generateBtn,
+        storiesLoading: !!storiesLoading,
+        storiesOutput: !!storiesOutput,
+        userStoriesTextarea: !!userStoriesTextarea
+    });
+    
+    if (!generateBtn || !storiesLoading || !storiesOutput || !userStoriesTextarea) {
+        console.error('❌ Missing required elements for user story generation');
+        alert('Error: Required UI elements not found. Please refresh the page and try again.');
+        return;
+    }
     
     // Reset status and tip text to initial values
-    const statusElement = document.getElementById('stories-status');
-    const tipElement = document.getElementById('stories-tip');
+    const statusElement = document.getElementById(prefix + 'stories-status');
+    const tipElement = document.getElementById(prefix + 'stories-tip');
     if (statusElement) statusElement.textContent = "Sunny is analyzing your requirements...";
     if (tipElement) tipElement.textContent = educationalTips[2]; // Use user stories tip
     
     // Reset progress bar and state
     resetProgress();
-    const progressBar = document.getElementById('stories-progress-bar');
-    const percentageDisplay = document.getElementById('stories-percentage');
+    const progressBar = document.getElementById(prefix + 'stories-progress-bar');
+    const percentageDisplay = document.getElementById(prefix + 'stories-percentage');
     if (progressBar) progressBar.style.width = '0%';
     if (percentageDisplay) percentageDisplay.textContent = '0%';
     
+    console.log('🔍 Debug: Progress elements:', {
+        progressBar: !!progressBar,
+        percentageDisplay: !!percentageDisplay
+    });
+    
     // Hide button and show loading
+    console.log('🔍 Debug: Setting loading display to block');
     generateBtn.style.display = 'none';
     storiesLoading.style.display = 'block';
     storiesOutput.style.display = 'none';
     
+    // Verify the display was set
+    const computedDisplay = window.getComputedStyle(storiesLoading).display;
+    console.log('🔍 Debug: After setting, storiesLoading display is:', computedDisplay);
+    console.log('🔍 Debug: storiesLoading visibility:', window.getComputedStyle(storiesLoading).visibility);
+    console.log('🔍 Debug: storiesLoading opacity:', window.getComputedStyle(storiesLoading).opacity);
+    
+    // Scroll to the loading indicator to ensure it's visible
+    console.log('🔍 Debug: Scrolling to loading indicator');
+    storiesLoading.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
     // Start tips rotation only
-    startTipsRotation('stories-tip');
+    startTipsRotation(prefix + 'stories-tip');
     
     try {
         // Use cached requirements if available (faster, no LLM call to re-extract)
@@ -954,6 +1383,7 @@ async function generateUserStories() {
             const decoder = new TextDecoder();
             let buffer = '';
             let finalData = null;
+            let streamError = null;
             
             while (true) {
                 const { done, value } = await reader.read();
@@ -970,7 +1400,9 @@ async function generateUserStories() {
                             const data = JSON.parse(line.slice(6));
                             
                             if (data.error) {
-                                throw new Error(data.error);
+                                // Store the error to throw after stream completes
+                                streamError = new Error(data.error);
+                                console.error('❌ Server error:', data.error);
                             }
                             
                             if (data.complete) {
@@ -982,7 +1414,7 @@ async function generateUserStories() {
                                 console.log(`📊 Progress update: ${data.progress}% - ${data.stage}`);
                                 
                                 // Animate progress smoothly to target
-                                animateProgressTo('stories-progress-bar', 'stories-percentage', data.progress);
+                                animateProgressTo(prefix + 'stories-progress-bar', prefix + 'stories-percentage', data.progress);
                                 
                                 // Update status message (keep previous message if stage is empty)
                                 if (statusElement && data.stage) {
@@ -991,9 +1423,18 @@ async function generateUserStories() {
                             }
                         } catch (e) {
                             console.error('Error parsing SSE data:', e);
+                            // Store parse errors as well
+                            if (!streamError) {
+                                streamError = e;
+                            }
                         }
                     }
                 }
+            }
+            
+            // Throw stream error if one occurred
+            if (streamError) {
+                throw streamError;
             }
             
             if (!finalData) {
@@ -1037,38 +1478,49 @@ async function generateUserStories() {
         // Show button again on error
         generateBtn.style.display = 'inline-flex';
         storiesLoading.style.display = 'none';
+    } finally {
+        // Reset flag to allow future requests
+        isGeneratingStories = false;
     }
 }
 
 function showStoriesActionButtons() {
+    // Detect if we're on requirements page or in modal
+    const isRequirementsPage = requirementsPage && requirementsPage.classList.contains('visible');
+    const prefix = isRequirementsPage ? 'requirements-' : '';
+    
     // Check if action buttons container exists, if not create it
-    let actionsContainer = document.getElementById('stories-actions');
+    let actionsContainer = document.getElementById(prefix + 'stories-actions');
     if (!actionsContainer) {
         actionsContainer = document.createElement('div');
-        actionsContainer.id = 'stories-actions';
+        actionsContainer.id = prefix + 'stories-actions';
         actionsContainer.style.cssText = 'display: flex; gap: 0.5rem; margin-bottom: 1rem;';
         
-        const generateBtn = document.getElementById('generate-stories-btn');
+        const generateBtn = document.getElementById(prefix + 'generate-stories-btn');
         generateBtn.parentNode.insertBefore(actionsContainer, generateBtn);
     }
     
     actionsContainer.innerHTML = `
         <button class="view-stories-btn" onclick="viewUserStoriesBoard()" style="background: #10b981; color: white; padding: 0.875rem 1.5rem; border: none; border-radius: 10px; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 1rem; box-shadow: 0 3px 10px rgba(16,185,129,0.3);">
             <span class="material-symbols-outlined">view_kanban</span>
-            View Stories
+            View Stories Board
         </button>
         <button class="regenerate-stories-btn" onclick="regenerateUserStories()" style="background: #f59e0b; color: white; padding: 0.875rem 1.5rem; border: none; border-radius: 10px; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 1rem; box-shadow: 0 3px 10px rgba(245,158,11,0.3);">
             <span class="material-symbols-outlined">refresh</span>
-            Regenerate
+            Regenerate Stories
         </button>
     `;
     actionsContainer.style.display = 'flex';
 }
 
 function regenerateUserStories() {
-    const actionsContainer = document.getElementById('stories-actions');
-    const generateBtn = document.getElementById('generate-stories-btn');
-    const storiesOutput = document.getElementById('stories-output');
+    // Detect if we're on requirements page or in modal
+    const isRequirementsPage = requirementsPage && requirementsPage.classList.contains('visible');
+    const prefix = isRequirementsPage ? 'requirements-' : '';
+    
+    const actionsContainer = document.getElementById(prefix + 'stories-actions');
+    const generateBtn = document.getElementById(prefix + 'generate-stories-btn');
+    const storiesOutput = document.getElementById(prefix + 'stories-output');
     
     // Hide actions and output
     if (actionsContainer) actionsContainer.style.display = 'none';
@@ -1089,7 +1541,7 @@ async function viewUserStoriesBoard() {
         const response = await fetch(`/api/projects/${currentProject.id}/stories`);
         if (!response.ok) throw new Error('Failed to fetch user stories');
         
-        const { epics, statusCounts } = await response.json();
+        const { epics, statusCounts, removedCount } = await response.json();
         
         // Show modal
         const modal = document.getElementById('user-stories-board-modal');
@@ -1107,6 +1559,14 @@ async function viewUserStoriesBoard() {
                 <div style="color: #6b7280; font-size: 0.875rem;">In Progress</div>
             </div>
             <div style="flex: 1; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #6366f1;">${statusCounts.readyForReview}</div>
+                <div style="color: #6b7280; font-size: 0.875rem;">Ready for Review</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #ec4899;">${statusCounts.inReview}</div>
+                <div style="color: #6b7280; font-size: 0.875rem;">In Review</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
                 <div style="font-size: 2rem; font-weight: bold; color: #10b981;">${statusCounts.done}</div>
                 <div style="color: #6b7280; font-size: 0.875rem;">Done</div>
             </div>
@@ -1114,6 +1574,12 @@ async function viewUserStoriesBoard() {
                 <div style="font-size: 2rem; font-weight: bold; color: #111827;">${statusCounts.total}</div>
                 <div style="color: #6b7280; font-size: 0.875rem;">Total</div>
             </div>
+            ${removedCount > 0 ? `
+            <div style="flex: 1; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #9ca3af;">${removedCount}</div>
+                <div style="color: #6b7280; font-size: 0.875rem;">Removed</div>
+            </div>
+            ` : ''}
         `;
         
         // Render stories by epic
@@ -1141,7 +1607,10 @@ function renderStoryCard(story) {
     const statusColors = {
         OPEN: { bg: '#dbeafe', text: '#1e40af', label: 'Open' },
         IN_PROGRESS: { bg: '#fef3c7', text: '#b45309', label: 'In Progress' },
-        DONE: { bg: '#d1fae5', text: '#065f46', label: 'Done' }
+        READY_FOR_REVIEW: { bg: '#e0e7ff', text: '#4338ca', label: 'Ready for Review' },
+        IN_REVIEW: { bg: '#fce7f3', text: '#9f1239', label: 'In Review' },
+        DONE: { bg: '#d1fae5', text: '#065f46', label: 'Done' },
+        REMOVED: { bg: '#f3f4f6', text: '#6b7280', label: 'Removed' }
     };
     
     const priorityColors = {
@@ -1176,7 +1645,6 @@ function renderStoryCard(story) {
                 <span style="background: #f3f4f6; color: #4b5563; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
                     ${story.effort}
                 </span>
-                ${story.storyPoints ? `<span style="background: #e0e7ff; color: #4338ca; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">${story.storyPoints} pts</span>` : ''}
             </div>
         </div>
     `;
@@ -1219,7 +1687,10 @@ async function editStory(storyId) {
                         <select id="edit-story-status" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
                             <option value="OPEN" ${story.status === 'OPEN' ? 'selected' : ''}>Open</option>
                             <option value="IN_PROGRESS" ${story.status === 'IN_PROGRESS' ? 'selected' : ''}>In Progress</option>
+                            <option value="READY_FOR_REVIEW" ${story.status === 'READY_FOR_REVIEW' ? 'selected' : ''}>Ready for Review</option>
+                            <option value="IN_REVIEW" ${story.status === 'IN_REVIEW' ? 'selected' : ''}>In Review</option>
                             <option value="DONE" ${story.status === 'DONE' ? 'selected' : ''}>Done</option>
+                            <option value="REMOVED" ${story.status === 'REMOVED' ? 'selected' : ''}>Removed</option>
                         </select>
                     </div>
                     
@@ -1255,18 +1726,6 @@ async function editStory(storyId) {
                 <div>
                     <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Benefit</label>
                     <textarea id="edit-story-benefit" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; min-height: 60px;">${story.benefit}</textarea>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div>
-                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Story Points</label>
-                        <input id="edit-story-points" type="number" value="${story.storyPoints || ''}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
-                    </div>
-                    
-                    <div>
-                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Sprint</label>
-                        <input id="edit-story-sprint" type="number" value="${story.sprint || ''}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
-                    </div>
                 </div>
                 
                 <div>
@@ -1326,8 +1785,6 @@ async function saveStory(storyId) {
         const actor = document.getElementById('edit-story-actor').value;
         const action = document.getElementById('edit-story-action').value;
         const benefit = document.getElementById('edit-story-benefit').value;
-        const storyPoints = document.getElementById('edit-story-points').value;
-        const sprint = document.getElementById('edit-story-sprint').value;
         
         // Collect acceptance criteria
         const acInputs = document.querySelectorAll('.ac-input');
@@ -1347,8 +1804,6 @@ async function saveStory(storyId) {
                 actor,
                 action,
                 benefit,
-                storyPoints: storyPoints ? parseInt(storyPoints) : null,
-                sprint: sprint ? parseInt(sprint) : null,
                 acceptanceCriteria
             })
         });
@@ -1472,21 +1927,25 @@ function downloadUserStories() {
 async function generateFlowchart() {
     if (!currentProject || !cachedRequirements) return;
     
-    const generateBtn = document.getElementById('generate-flowchart-btn');
-    const flowchartLoading = document.getElementById('flowchart-loading');
-    const flowchartOutput = document.getElementById('flowchart-output');
-    const flowchartTextarea = document.getElementById('detailed-flowchart-output');
+    // Detect if we're on requirements page or in modal
+    const isRequirementsPage = requirementsPage && requirementsPage.classList.contains('visible');
+    const prefix = isRequirementsPage ? 'requirements-' : '';
+    
+    const generateBtn = document.getElementById(prefix + 'generate-flowchart-btn');
+    const flowchartLoading = document.getElementById(prefix + 'flowchart-loading');
+    const flowchartOutput = document.getElementById(prefix + 'flowchart-output');
+    const flowchartTextarea = document.getElementById(prefix + 'detailed-flowchart-output');
     
     // Reset status and tip text to initial values
-    const statusElement = document.getElementById('flowchart-status');
-    const tipElement = document.getElementById('flowchart-tip');
+    const statusElement = document.getElementById(prefix + 'flowchart-status');
+    const tipElement = document.getElementById(prefix + 'flowchart-tip');
     if (statusElement) statusElement.textContent = "Sunny is analyzing your system architecture...";
     if (tipElement) tipElement.textContent = "Workflow diagrams make it easier to visualize how your system will operate";
     
     // Reset progress bar and state
     resetProgress();
-    const progressBar = document.getElementById('flowchart-progress-bar');
-    const percentageDisplay = document.getElementById('flowchart-percentage');
+    const progressBar = document.getElementById(prefix + 'flowchart-progress-bar');
+    const percentageDisplay = document.getElementById(prefix + 'flowchart-percentage');
     if (progressBar) progressBar.style.width = '0%';
     if (percentageDisplay) percentageDisplay.textContent = '0%';
     
@@ -1502,13 +1961,13 @@ async function generateFlowchart() {
         "Visual workflows help identify bottlenecks before development begins",
         "Detailed diagrams clarify system interactions and dependencies"
     ];
-    startTipsRotation('flowchart-tip', flowchartTips);
+    startTipsRotation(prefix + 'flowchart-tip', flowchartTips);
     
     try {
         const response = await fetch('/analyst/generate-flowchart-stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requirements: cachedRequirements })
+            body: JSON.stringify({ requirements: cachedRequirements, projectId: currentProject.id })
         });
         
         if (!response.ok) {
@@ -1520,6 +1979,7 @@ async function generateFlowchart() {
         const decoder = new TextDecoder();
         let buffer = '';
         let finalData = null;
+        let streamError = null;
         
         while (true) {
             const { done, value } = await reader.read();
@@ -1536,7 +1996,9 @@ async function generateFlowchart() {
                         const data = JSON.parse(line.slice(6));
                         
                         if (data.error) {
-                            throw new Error(data.error);
+                            // Store the error to throw after stream completes
+                            streamError = new Error(data.error);
+                            console.error('❌ Server error:', data.error);
                         }
                         
                         if (data.complete) {
@@ -1548,16 +2010,25 @@ async function generateFlowchart() {
                             console.log(`📊 Progress update: ${data.progress}% - ${data.stage}`);
                             
                             // Animate progress smoothly to target
-                            animateProgressTo('flowchart-progress-bar', 'flowchart-percentage', data.progress);
+                            animateProgressTo(prefix + 'flowchart-progress-bar', prefix + 'flowchart-percentage', data.progress);
                             
                             // Update status message immediately
                             if (statusElement && data.stage) statusElement.textContent = data.stage;
                         }
                     } catch (e) {
                         console.error('Error parsing SSE data:', e);
+                        // Store parse errors as well
+                        if (!streamError) {
+                            streamError = e;
+                        }
                     }
                 }
             }
+        }
+        
+        // Throw stream error if one occurred
+        if (streamError) {
+            throw streamError;
         }
         
         if (!finalData) {
@@ -1613,6 +2084,17 @@ function copyFlowchart(event) {
 function downloadFlowchart() {
     const flowchartTextarea = document.getElementById('detailed-flowchart-output');
     const content = flowchartTextarea.value;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentProject.name}-detailed-workflow.mmd`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function downloadRequirementsFlowchart() {
+    const content = requirementsFlowchartOutput.value;
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2251,6 +2733,8 @@ function checkVoiceSupport() {
 sendBtn.addEventListener('click', sendMessage);
 polishBtn.addEventListener('click', polishText);
 extractBtn.addEventListener('click', extractRequirements);
+openRequirementsBtn.addEventListener('click', showRequirementsPage);
+refreshRequirementsChatBtn.addEventListener('click', extractRequirements);
 uploadExcelBtn.addEventListener('click', uploadExcel);
 excelFileInput.addEventListener('change', handleExcelUpload);
 uploadImageBtn.addEventListener('click', uploadImage);
@@ -2312,8 +2796,13 @@ window.addEventListener('popstate', () => {
     
     const hash = window.location.hash;
     if (hash.startsWith('#/project/')) {
-        const projectId = hash.replace('#/project/', '');
-        loadProjectFromUrl(projectId);
+        const parts = hash.split('/');
+        const projectId = parts[2];
+        if (parts[3] === 'requirements') {
+            loadRequirementsFromUrl(projectId);
+        } else {
+            loadProjectFromUrl(projectId);
+        }
     } else if (hash === '#/admin' && currentUser.isAdmin) {
         showAdminDashboard();
     } else {
@@ -2334,9 +2823,9 @@ async function showSeedDataModal() {
     const spreadsheetSelect = document.getElementById('spreadsheet-select');
     const detailsDiv = document.getElementById('spreadsheet-details');
     
-    // Show modal with loading state
-    loadingDiv.style.display = 'block';
-    contentDiv.style.display = 'none';
+    // Show modal directly without loading state
+    loadingDiv.style.display = 'none';
+    contentDiv.style.display = 'block';
     modal.classList.add('visible');
     
     try {
@@ -2373,10 +2862,6 @@ async function showSeedDataModal() {
         // Reset selection
         detailsDiv.style.display = 'none';
         selectedSpreadsheetData = null;
-        
-        // Show content
-        loadingDiv.style.display = 'none';
-        contentDiv.style.display = 'block';
         
         if (spreadsheetAttachments.length === 0) {
             spreadsheetSelect.innerHTML = '<option value="">No spreadsheets found in this project</option>';
@@ -2451,104 +2936,117 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-function exportAsJSON() {
+async function exportAsJSON() {
     if (!selectedSpreadsheetData) return;
     
-    const json = JSON.stringify(selectedSpreadsheetData.parsedData, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${selectedSpreadsheetData.filename.replace(/\.[^/.]+$/, '')}-seed-data.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-function exportAsSQL() {
-    if (!selectedSpreadsheetData) return;
-    
-    let sql = '-- Seed Data SQL\n';
-    sql += `-- Generated from: ${selectedSpreadsheetData.filename}\n`;
-    sql += `-- Date: ${new Date().toISOString()}\n\n`;
-    
-    // Generate SQL INSERT statements for each sheet
-    Object.keys(selectedSpreadsheetData.parsedData).forEach(sheetName => {
-        const sheetData = selectedSpreadsheetData.parsedData[sheetName];
-        
-        if (sheetData.length === 0) return;
-        
-        // Sanitize table name
-        const tableName = sheetName.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
-        
-        sql += `-- Table: ${tableName}\n`;
-        
-        // Assume first row is headers
-        const headers = sheetData[0];
-        const dataRows = sheetData.slice(1);
-        
-        if (headers && headers.length > 0 && dataRows.length > 0) {
-            // Generate column names
-            const columns = headers.map((h, idx) => 
-                h ? String(h).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase() : `column_${idx + 1}`
-            );
-            
-            dataRows.forEach(row => {
-                const values = row.map(val => {
-                    if (val === null || val === undefined || val === '') return 'NULL';
-                    if (typeof val === 'number') return val;
-                    // Escape single quotes in strings
-                    return `'${String(val).replace(/'/g, "''")}'`;
-                });
-                
-                sql += `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${values.join(', ')});\n`;
-            });
-            
-            sql += '\n';
-        }
-    });
-    
-    const blob = new Blob([sql], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${selectedSpreadsheetData.filename.replace(/\.[^/.]+$/, '')}-seed-data.sql`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-function exportAsCSV() {
-    if (!selectedSpreadsheetData) return;
-    
-    // Create a CSV file for each sheet
-    Object.keys(selectedSpreadsheetData.parsedData).forEach(sheetName => {
-        const sheetData = selectedSpreadsheetData.parsedData[sheetName];
-        
-        if (sheetData.length === 0) return;
-        
-        // Convert to CSV
-        let csv = '';
-        sheetData.forEach(row => {
-            const csvRow = row.map(cell => {
-                if (cell === null || cell === undefined) return '';
-                const cellStr = String(cell);
-                // Escape quotes and wrap in quotes if contains comma, quote, or newline
-                if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
-                    return `"${cellStr.replace(/"/g, '""')}"`;
-                }
-                return cellStr;
-            });
-            csv += csvRow.join(',') + '\n';
+    try {
+        // Save to database first
+        const response = await fetch('/analyst/generate-seed-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                projectId: currentProject.id,
+                attachmentId: selectedSpreadsheetData.id,
+                format: 'json'
+            })
         });
         
-        const blob = new Blob([csv], { type: 'text/csv' });
+        if (!response.ok) {
+            throw new Error('Failed to generate seed data');
+        }
+        
+        const result = await response.json();
+        
+        // Download the file
+        const blob = new Blob([result.data], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        const sanitizedSheetName = sheetName.replace(/[^a-zA-Z0-9_]/g, '_');
-        a.download = `${selectedSpreadsheetData.filename.replace(/\.[^/.]+$/, '')}-${sanitizedSheetName}.csv`;
+        a.download = result.filename;
         a.click();
         URL.revokeObjectURL(url);
-    });
+    } catch (error) {
+        console.error('Error exporting JSON:', error);
+        alert('Failed to generate seed data. Please try again.');
+    }
+}
+
+async function exportAsSQL() {
+    if (!selectedSpreadsheetData) return;
+    
+    try {
+        // Save to database first
+        const response = await fetch('/analyst/generate-seed-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                projectId: currentProject.id,
+                attachmentId: selectedSpreadsheetData.id,
+                format: 'sql'
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to generate seed data');
+        }
+        
+        const result = await response.json();
+        
+        // Download the file
+        const blob = new Blob([result.data], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = result.filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('Error exporting SQL:', error);
+        alert('Failed to generate seed data. Please try again.');
+    }
+}
+
+async function exportAsCSV() {
+    if (!selectedSpreadsheetData) return;
+    
+    try {
+        // Save to database first
+        const response = await fetch('/analyst/generate-seed-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                projectId: currentProject.id,
+                attachmentId: selectedSpreadsheetData.id,
+                format: 'csv'
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to generate seed data');
+        }
+        
+        const result = await response.json();
+        
+        // Parse CSV data (stored as JSON object with sheet names as keys)
+        const csvData = JSON.parse(result.data);
+        
+        // Download a CSV file for each sheet
+        Object.keys(csvData).forEach(sheetName => {
+            const csv = csvData[sheetName];
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const sanitizedSheetName = sheetName.replace(/[^a-zA-Z0-9_]/g, '_');
+            a.download = `${selectedSpreadsheetData.filename.replace(/\.[^/.]+$/, '')}-${sanitizedSheetName}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    } catch (error) {
+        console.error('Error exporting CSV:', error);
+        alert('Failed to generate seed data. Please try again.');
+    }
 }
 
 // Close seed data modal when clicking outside

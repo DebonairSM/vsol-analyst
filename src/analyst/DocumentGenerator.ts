@@ -456,13 +456,7 @@ export class DocumentGenerator {
         lines.push(`**So that** ${story.benefit}`);
         lines.push("");
 
-        let metaLine = `**Priority:** ${story.priority} | **Effort:** ${story.effort}`;
-        if (story.storyPoints) {
-          metaLine += ` | **Story Points:** ${story.storyPoints}`;
-        }
-        if (story.sprint) {
-          metaLine += ` | **Sprint:** ${story.sprint}`;
-        }
+        const metaLine = `**Priority:** ${story.priority} | **Effort:** ${story.effort} | **Team:** ${story.team || "Team Sunny"}`;
         lines.push(metaLine);
         lines.push("");
 

@@ -31,20 +31,25 @@ model Company {
 }
 
 model Project {
-  id                    String        @id @default(cuid())
-  name                  String
-  companyId             String
-  company               Company       @relation(fields: [companyId], references: [id])
-  sessions              ChatSession[]
-  epics                 Epic[]
-  userStories           UserStory[]
-  sourceProjectId       String?
-  sourceProject         Project?      @relation("ProjectBranch", fields: [sourceProjectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  branchedProjects      Project[]     @relation("ProjectBranch")
-  generatedRequirements Json?
-  generatedUserStories  Json?
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  id                       String        @id @default(cuid())
+  name                     String
+  companyId                String
+  company                  Company       @relation(fields: [companyId], references: [id])
+  sessions                 ChatSession[]
+  epics                    Epic[]
+  userStories              UserStory[]
+  sourceProjectId          String?
+  sourceProject            Project?      @relation("ProjectBranch", fields: [sourceProjectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  branchedProjects         Project[]     @relation("ProjectBranch")
+  generatedRequirements    Json?
+  generatedUserStories     Json?
+  requirementsExtractedAt  DateTime?
+  requirementsMarkdown     String?
+  requirementsMermaid      String?
+  detailedFlowchartMermaid String?
+  seedData                 Json?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
 }
 
 model ChatSession {
@@ -72,7 +77,10 @@ model Attachment {
 enum StoryStatus {
   OPEN
   IN_PROGRESS
+  READY_FOR_REVIEW
+  IN_REVIEW
   DONE
+  REMOVED
 }
 
 enum StoryPriority {
@@ -100,24 +108,33 @@ model Epic {
 }
 
 model UserStory {
-  id                  String         @id @default(cuid())
+  id                  String              @id @default(cuid())
   title               String
   actor               String
   action              String
   benefit             String
-  status              StoryStatus    @default(OPEN)
+  status              StoryStatus         @default(OPEN)
   priority            StoryPriority
   effort              StoryEffort
-  storyPoints         Int?
-  sprint              Int?
+  team                String              @default("Team Sunny")
   acceptanceCriteria  Json
   epicId              String
-  epic                Epic           @relation(fields: [epicId], references: [id], onDelete: Cascade)
+  epic                Epic                @relation(fields: [epicId], references: [id], onDelete: Cascade)
   projectId           String
-  project             Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project             Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   originalStoryId     String?
-  originalStory       UserStory?     @relation("StoryBranch", fields: [originalStoryId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  branchedStories     UserStory[]    @relation("StoryBranch")
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  originalStory       UserStory?          @relation("StoryBranch", fields: [originalStoryId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  branchedStories     UserStory[]         @relation("StoryBranch")
+  statusTransitions   StatusTransition[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+}
+
+model StatusTransition {
+  id          String      @id @default(cuid())
+  userStoryId String
+  userStory   UserStory   @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
+  fromStatus  StoryStatus?
+  toStatus    StoryStatus
+  transitionedAt DateTime @default(now())
 }

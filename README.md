@@ -1,512 +1,415 @@
-# Sunny - VSol Systems Analyst Agent
+# VSol Analyst
 
-AI-powered business requirements discovery tool using OpenAI with Google authentication and per-user project management.
+AI-powered business requirements discovery tool that helps gather and document system requirements through natural conversation.
 
-Meet Sunny, your friendly systems analyst agent who helps gather and document business requirements through natural conversation.
+## Overview
 
-## Features
+VSol Analyst is a web-based application that facilitates requirements gathering for software projects. The system uses AI to conduct interactive conversations with clients, analyze uploaded documents, extract structured requirements, and generate technical documentation including user stories and workflow diagrams.
 
-- Google OAuth authentication
-- Per-user project management
-- Admin dashboard to monitor all client sessions
-- Interactive chat with customers to understand their workflows
-- File upload and analysis:
-  - Excel spreadsheet analysis (structure, headers, data patterns)
-  - Image/screenshot analysis with AI vision
-  - Automatic data entity extraction from spreadsheets
-- Automatic extraction of structured requirements from conversations
-- Generate requirements documents in Markdown format
-- Generate user stories from requirements
-- Generate workflow diagrams in Mermaid format
-- Text polishing with AI
+## Key Features
+
+- Google OAuth authentication with role-based access
+- Project-based conversation management
+- File upload and analysis (Excel spreadsheets, images/screenshots)
+- AI vision support for diagram and mockup analysis
+- Structured requirements extraction
+- User story generation with epics and acceptance criteria
+- Mermaid workflow diagram generation
+- Admin dashboard for monitoring client sessions
 - Persistent chat history per project
-- Attachment storage and retrieval
+- Automated database backups
 
-## Setup
+## Installation
 
-### 1. Install Dependencies
+### Prerequisites
 
-```bash
-npm install
-```
+- Node.js (v20 or higher)
+- npm
+- Google Cloud account (for OAuth setup)
+- OpenAI API account
 
-### 2. Configure Environment Variables
+### Setup Steps
 
-Create a `.env` file in the root directory with the following variables:
-
-```bash
-# OpenAI API Key
-OPENAI_API_KEY=sk-your-actual-key-here
-
-# Database (SQLite - file path)
-DATABASE_URL=file:./dev.db
-
-# Google OAuth Credentials
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-CALLBACK_URL=http://localhost:5051/auth/google/callback
-
-# Session Secret (use a random string in production)
-SESSION_SECRET=random-secret-string-change-in-production
-```
-
-#### Getting OpenAI API Key
-
-Get your API key from: https://platform.openai.com/api-keys
-
-#### Setting up Google OAuth
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable the Google+ API:
-   - Navigate to "APIs & Services" > "Library"
-   - Search for "Google+ API" and enable it
-4. Create OAuth 2.0 credentials:
-   - Navigate to "APIs & Services" > "Credentials"
-   - Click "Create Credentials" > "OAuth client ID"
-   - Select "Web application"
-   - Add authorized redirect URI: `http://localhost:5051/auth/google/callback`
-   - Copy the Client ID and Client Secret to your `.env` file
-
-**Important Notes:**
-- The `.env` file is in `.gitignore` and will not be committed.
-- Always access the application via `http://localhost:5051` (not via IP addresses like 192.168.1.65)
-- If you see a "device_id and device_name are required" error, you're trying to access the app via a private IP address. Use `localhost` instead.
-- In Google Cloud Console, make sure the authorized redirect URI is exactly: `http://localhost:5051/auth/google/callback`
-
-### 3. Initialize Database
-
-Run Prisma migrations to create the SQLite database:
-
-```bash
-npx prisma migrate dev
-```
-
-This creates a `dev.db` file in your project root with the required tables:
-- Users (with Google authentication)
-- Companies (one per user by default)
-- Projects (multiple per company)
-- ChatSessions (chat history per project)
-
-### 4. Run the Server
-
-```bash
-npm run dev
-```
-
-The server will start on port 5051 and serve the application at http://localhost:5051
-
-### 5. Set Up Admin Access (Optional)
-
-To access the admin dashboard and view all client sessions:
-
-1. First, log in with your Google account at http://localhost:5051
-2. Open Prisma Studio to modify your user record:
+1. **Clone the repository**
    ```bash
-   npx prisma studio
+   git clone <repository-url>
+   cd vsol-analyst
    ```
-3. Navigate to the `User` table
-4. Find your user record and set `isAdmin` to `true`
-5. Refresh your browser
 
-You'll now see an "ADMIN" badge in the header and an "Admin Dashboard" button on the projects page.
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables**
+   
+   Create a `.env` file in the root directory:
+   ```env
+   # OpenAI API Key
+   OPENAI_API_KEY=sk-your-actual-key-here
+   
+   # Database (SQLite - file path)
+   DATABASE_URL=file:./prisma/dev.db
+   
+   # Google OAuth Credentials
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
+   CALLBACK_URL=http://localhost:5051/auth/google/callback
+   
+   # Session Secret
+   SESSION_SECRET=random-secret-string-change-in-production
+   
+   # Optional: Custom backup location
+   BACKUP_PATH=C:\custom\backup\path
+   ```
+
+4. **Set up Google OAuth**
+   
+   a. Go to [Google Cloud Console](https://console.cloud.google.com/)
+   
+   b. Create a new project or select an existing one
+   
+   c. Enable the Google+ API:
+      - Navigate to "APIs & Services" > "Library"
+      - Search for "Google+ API" and enable it
+   
+   d. Create OAuth 2.0 credentials:
+      - Navigate to "APIs & Services" > "Credentials"
+      - Click "Create Credentials" > "OAuth client ID"
+      - Select "Web application"
+      - Add authorized redirect URI: `http://localhost:5051/auth/google/callback`
+      - Copy the Client ID and Client Secret to your `.env` file
+
+5. **Get OpenAI API Key**
+   
+   Visit https://platform.openai.com/api-keys and create a new API key.
+
+6. **Initialize the database**
+   ```bash
+   npx prisma migrate dev
+   ```
+   
+   This creates the SQLite database with all required tables.
+
+7. **Start the server**
+   ```bash
+   npm run dev
+   ```
+   
+   The application will be available at http://localhost:5051
+
+8. **Set up admin access (optional)**
+   
+   a. Log in with your Google account at http://localhost:5051
+   
+   b. Open Prisma Studio:
+      ```bash
+      npx prisma studio
+      ```
+   
+   c. Navigate to the `User` table and set `isAdmin` to `true` for your user
+   
+   d. Refresh your browser to access the admin dashboard
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `OPENAI_API_KEY` | OpenAI API key for GPT models | Yes |
+| `DATABASE_URL` | Database connection string | Yes |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | Yes |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | Yes |
+| `CALLBACK_URL` | OAuth callback URL | Yes |
+| `SESSION_SECRET` | Session encryption secret | Yes |
+| `BACKUP_PATH` | Custom backup directory path | No |
+
+### Model Configuration
+
+The application uses two OpenAI models:
+
+- **gpt-4o-mini**: Default model for chat, requirements extraction, and story generation (cost-optimized)
+- **gpt-4o**: Automatic refinement model when quality issues are detected
+
+Refinement triggers:
+- Requirements: Missing actor/module relationships, orphaned components
+- User stories: Missing acceptance criteria, vague actions, quality score below 70/100
 
 ## Usage
 
-### Web Interface
+### For Clients
 
-**For Clients:**
-1. Open http://localhost:5051 in your browser
-2. Sign in with your Google account
-3. Create a new project or select an existing one
-4. Start chatting with Sunny about your business
-5. Upload files to share information with Sunny:
-   - **Excel spreadsheets** (.xls, .xlsx): Automatic analysis of all sheets, rows, columns, headers, and sample data
-   - **Images/Screenshots** (.png, .jpg, .gif, .webp): AI vision analysis to understand diagrams, mockups, and visual requirements
-   - All file analysis is preserved in the conversation history
-6. When ready, click "Extract Requirements" to generate structured output:
-   - Dedicated "Uploaded Documents and Data Sources" section for all files
-   - Complete spreadsheet structure documentation (sheets, columns, headers, sample data)
-   - Data entities extracted from spreadsheets with field-level details
-   - Image analysis insights incorporated into requirements
-   - Professional markdown and Mermaid workflow diagram
-7. Generate user stories from extracted requirements (optional)
-8. Download the requirements.md, user-stories.md, and workflow.mmd files
+1. **Create a project**
+   - Sign in with your Google account
+   - Create a new project or select an existing one
 
-**For Admins:**
-1. After setting up admin access (see Setup section), log in
-2. Click "Admin Dashboard" button on your projects page
-3. View system statistics (total users, projects, sessions)
-4. Browse all users and their projects
-5. View any client's chat history in read-only mode
-6. Monitor client conversations and review extracted requirements
+2. **Conduct requirements gathering**
+   - Chat with the AI about your business needs
+   - Upload Excel spreadsheets for automatic structure analysis
+   - Upload images/screenshots for AI vision analysis
+   - All conversations and files are saved per project
+
+3. **Extract requirements**
+   - Click "Extract Requirements" when ready
+   - System generates structured requirements document
+   - Output includes Mermaid workflow diagram
+   - Download requirements.md and workflow.mmd files
+
+4. **Generate user stories (optional)**
+   - Generate user stories from extracted requirements
+   - Output includes epics, acceptance criteria, and priority levels
+   - Download user-stories.md file
+
+### For Administrators
+
+1. **Access admin dashboard**
+   - Log in with an admin account
+   - Click "Admin Dashboard" on the projects page
+
+2. **Monitor system usage**
+   - View total users, projects, and sessions
+   - Browse all users and their projects
+   - View any client's chat history (read-only)
+   - Review extracted requirements
 
 ### Database Management
 
-View and manage your database with Prisma Studio:
-
+**View and edit database:**
 ```bash
 npx prisma studio
 ```
 
-This opens a visual interface at http://localhost:5555 to browse and edit your data.
-
-### Database Backup
-
-Create a backup of your database to OneDrive:
-
+**Create database backup:**
 ```bash
 npm run backup
 ```
 
-The backup script:
-- Automatically backs up to `%USERPROFILE%\OneDrive\Documents\vsol-analyst-backups\`
-- Creates timestamped backup files
-- Keeps the 10 most recent backups
-- Can be customized with the `BACKUP_PATH` environment variable
+Backups are stored in `%USERPROFILE%\OneDrive\Documents\vsol-analyst-backups\` by default. The system retains the 10 most recent backups.
 
-For more details on setting up scheduled backups, see [backup-setup.md](backup-setup.md).
+**Restore from backup:**
+1. Stop the server
+2. Copy the backup file to `prisma/dev.db`
+3. Restart the server
 
 ## Architecture
 
-The application uses a modular route-based architecture:
+### Technology Stack
 
-- **Modular Routes**: Each functional area (auth, projects, admin, analyst, attachments) has its own route module in `src/routes/`
-- **Separation of Concerns**: Business logic is organized into specialized modules (LLM providers, requirements extraction, document generation)
-- **Middleware**: Authentication and authorization are handled through reusable middleware
-- **Type Safety**: Full TypeScript implementation with strict typing
+- **Runtime**: Node.js with TypeScript
+- **Framework**: Express with modular routing
+- **Database**: SQLite with Prisma ORM
+- **Authentication**: Passport.js with Google OAuth 2.0
+- **AI Models**: OpenAI GPT-4 and GPT-4o-mini
+- **Session Management**: express-session
+- **File Processing**: Multer for uploads, xlsx for spreadsheet analysis
 
-## API Endpoints
-
-### Authentication (`/auth`)
-
-- `GET /auth/google` - Initiate Google OAuth flow
-- `GET /auth/google/callback` - OAuth callback handler
-- `GET /auth/logout` - Logout current user
-- `GET /auth/me` - Get current user info
-
-### Projects (`/api/projects`)
-
-- `GET /api/projects` - List user's projects
-- `POST /api/projects` - Create new project (requires `{ name: string }`)
-- `GET /api/projects/:id` - Get project details
-- `PATCH /api/projects/:id` - Update project (requires `{ name: string }`)
-
-### Attachments (`/api/attachments`)
-
-- `GET /api/attachments/:id` - Serve uploaded file (images, spreadsheets)
-
-### Admin (`/api/admin`) - requires admin role
-
-- `GET /api/admin/stats` - Get system statistics (user count, project count, session count)
-- `GET /api/admin/users` - List all users with their projects
-- `GET /api/admin/projects` - List all projects from all users
-- `GET /api/admin/projects/:id/chat` - View chat history for any project
-
-### Chat & Analysis (`/analyst`)
-
-#### POST /analyst/upload-excel
-
-Upload and analyze an Excel spreadsheet for a project.
-
-**Request:**
-- Content-Type: `multipart/form-data`
-- Body:
-  - `file`: Excel file (.xls or .xlsx, max 10MB)
-  - `projectId`: Project ID
-
-**Response:**
-```json
-{
-  "filename": "data.xlsx",
-  "sheets": {
-    "Sheet1": [[...], [...]],
-    "Sheet2": [[...], [...]]
-  },
-  "summary": "📊 Excel File: data.xlsx\nNumber of sheets: 2...",
-  "attachmentId": "attachment-id",
-  "storedPath": "uploads/spreadsheets/..."
-}
-```
-
-#### POST /analyst/upload-image
-
-Upload and analyze an image or screenshot for a project.
-
-**Request:**
-- Content-Type: `multipart/form-data`
-- Body:
-  - `file`: Image file (PNG, JPG, GIF, WebP, max 10MB)
-  - `projectId`: Project ID
-
-**Response:**
-```json
-{
-  "filename": "screenshot.png",
-  "attachmentId": "attachment-id",
-  "storedPath": "uploads/images/...",
-  "analysis": "AI analysis of the image..."
-}
-```
-
-#### POST /analyst/chat
-
-Start or continue a conversation with Sunny for a specific project.
-
-**Request:**
-```json
-{
-  "projectId": "project-id",
-  "message": "We run a barber shop and use Excel for appointments"
-}
-```
-
-**Response:**
-```json
-{
-  "reply": "I understand you're using Excel for appointments. How many barbers do you have, and how do customers currently book their appointments?"
-}
-```
-
-#### POST /analyst/extract
-
-Extract structured requirements from the project's conversation history.
-
-**Request:**
-```json
-{
-  "projectId": "project-id"
-}
-```
-
-**Response:**
-```json
-{
-  "requirements": {
-    "businessContext": { ... },
-    "primaryGoal": "...",
-    "painPoints": [ ... ]
-  },
-  "markdown": "# System Requirements\n...",
-  "mermaid": "flowchart TD\n..."
-}
-```
-
-#### POST /analyst/generate-stories
-
-Generate user stories from a project's chat history.
-
-**Request:**
-```json
-{
-  "projectId": "project-id"
-}
-```
-
-**Response:**
-```json
-{
-  "userStories": [ ... ],
-  "markdown": "# User Stories\n..."
-}
-```
-
-#### POST /analyst/generate-stories-from-requirements
-
-Generate user stories from cached requirements (optimized).
-
-**Request:**
-```json
-{
-  "requirements": { ... }
-}
-```
-
-**Response:**
-```json
-{
-  "userStories": [ ... ],
-  "markdown": "# User Stories\n..."
-}
-```
-
-#### POST /analyst/polish
-
-Polish and improve text using AI.
-
-**Request:**
-```json
-{
-  "text": "raw text to polish"
-}
-```
-
-**Response:**
-```json
-{
-  "original": "raw text to polish",
-  "polished": "Improved and polished text..."
-}
-```
-
-## Technology
-
-- **LLM:** OpenAI GPT-4 with vision support
-- **Runtime:** Node.js with TypeScript
-- **Framework:** Express with modular routing
-- **Database:** SQLite with Prisma ORM (easily upgradeable to PostgreSQL)
-- **Authentication:** Passport.js with Google OAuth 2.0
-- **Session Management:** express-session
-- **File Processing:** Multer for uploads, xlsx for spreadsheet analysis
-
-## Project Structure
+### Project Structure
 
 ```
 vsol-analyst/
 ├── src/
-│   ├── auth/                    # Authentication (Passport, middleware)
-│   ├── routes/                  # API route modules
-│   │   ├── auth.ts              # Authentication routes
-│   │   ├── projects.ts          # Project management routes
-│   │   ├── attachments.ts       # File attachment routes
-│   │   ├── admin.ts             # Admin dashboard routes
-│   │   └── analyst.ts           # Chat and analysis routes
-│   ├── llm/                     # LLM provider abstraction
-│   ├── analyst/                 # Core analyst logic
-│   ├── backup/                  # Database backup utilities
-│   └── server.ts                # Express server
+│   ├── auth/              # Authentication (Passport, middleware)
+│   ├── routes/            # API route modules
+│   ├── llm/               # LLM provider abstraction
+│   ├── analyst/           # Core analyst logic
+│   ├── backup/            # Database backup utilities
+│   └── server.ts          # Express server
 ├── prisma/
-│   ├── schema.prisma            # Database schema
-│   └── migrations/              # Database migrations
-├── public/                      # Web UI (HTML, CSS, JS)
-├── uploads/                     # File uploads (images, spreadsheets)
-├── dev.db                       # SQLite database (gitignored)
-├── .env                         # Environment variables (gitignored)
+│   ├── schema.prisma      # Database schema
+│   └── migrations/        # Database migrations
+├── public/                # Web UI (HTML, CSS, JS)
+├── uploads/               # File uploads (images, spreadsheets)
+├── docs/                  # Technical documentation
+├── tests/                 # Test suites
 └── package.json
 ```
 
-## Database Schema
+### Database Schema
 
-- **User**: Stores user info from Google OAuth
-  - `isAdmin` flag for admin access (default: false)
-  - Auto-creates a default Company on first login
-- **Company**: Organizational container (one per user initially)
+- **User**: Stores user info from Google OAuth, includes admin flag
+- **Company**: Organizational container (one per user by default)
 - **Project**: User's individual projects
-  - Each project has its own chat sessions
-- **ChatSession**: Stores conversation history as JSON
-  - Linked to a specific project
-  - Contains all messages and file analysis
-- **Attachment**: Stores uploaded files
-  - Linked to a specific chat session
-  - Supports spreadsheets and images
-  - Tracks file type, path, and metadata
+- **ChatSession**: Stores conversation history as JSON, linked to projects
+- **Attachment**: Stores uploaded files with metadata
 
-## User Roles
+### User Roles
 
-The system supports two roles:
+**Client Users** (default):
+- Create and manage own projects
+- Chat with AI about business requirements
+- Extract and download requirements
+- Access own data only
 
-1. **Client Users** (default):
-   - Can create and manage their own projects
-   - Can chat with Sunny about their business
-   - Can extract and download requirements
-   - Only see their own data
+**Admin Users**:
+- All client user capabilities
+- Access to admin dashboard
+- View all users and projects
+- Monitor any client's sessions
+- System-wide statistics
 
-2. **Admin Users**:
-   - All client user capabilities
-   - Access admin dashboard with system statistics
-   - View all users and their projects
-   - Monitor any client's chat sessions (read-only)
-   - Review extracted requirements from all projects
+## API Endpoints
+
+### Authentication
+- `GET /auth/google` - Initiate OAuth flow
+- `GET /auth/google/callback` - OAuth callback
+- `GET /auth/logout` - Logout
+- `GET /auth/me` - Get current user
+
+### Projects
+- `GET /api/projects` - List user's projects
+- `POST /api/projects` - Create new project
+- `GET /api/projects/:id` - Get project details
+- `PATCH /api/projects/:id` - Update project
+
+### Analyst
+- `POST /analyst/chat` - Chat with AI
+- `POST /analyst/upload-excel` - Upload and analyze spreadsheet
+- `POST /analyst/upload-image` - Upload and analyze image
+- `POST /analyst/extract` - Extract requirements
+- `POST /analyst/generate-stories` - Generate user stories
+- `POST /analyst/polish` - Polish text with AI
+
+### Admin (requires admin role)
+- `GET /api/admin/stats` - System statistics
+- `GET /api/admin/users` - List all users
+- `GET /api/admin/projects` - List all projects
+- `GET /api/admin/projects/:id/chat` - View project chat
+
+### Attachments
+- `GET /api/attachments/:id` - Serve uploaded file
+
+## Troubleshooting
+
+### Google OAuth Error: "device_id and device_name are required"
+
+This error occurs when accessing the application via a private IP address instead of localhost.
+
+**Solution:**
+1. Ensure `CALLBACK_URL=http://localhost:5051/auth/google/callback` is in your `.env` file
+2. Access the application via `http://localhost:5051` (not `http://192.168.x.x:5051`)
+3. Verify the authorized redirect URI in Google Cloud Console matches exactly
+4. Restart the development server after updating `.env`
+
+### "Not authenticated" errors
+
+- Check that `SESSION_SECRET` is set in `.env`
+- Clear browser cookies and log in again
+- Verify the session middleware is properly configured
+
+### Database errors
+
+- Run `npx prisma migrate dev` to ensure the database schema is current
+- Check that `DATABASE_URL` is correctly set in `.env`
+- Verify the database file exists at the specified path
+
+### OpenAI API errors
+
+- Verify your `OPENAI_API_KEY` is valid at https://platform.openai.com/api-keys
+- Check that you have available credits in your OpenAI account
+- Monitor API rate limits if experiencing intermittent failures
+
+### File upload errors
+
+- Ensure the `uploads/` directory exists and has write permissions
+- Check file size limits (10MB maximum)
+- Verify supported file types: .xls, .xlsx for spreadsheets; .png, .jpg, .gif, .webp for images
 
 ## Deployment
 
-### Migrating to PostgreSQL (for production)
+### Production Considerations
 
-When ready to deploy to Render or similar cloud platforms:
+1. **Environment Variables**
+   - Use strong, random `SESSION_SECRET`
+   - Set appropriate `CALLBACK_URL` for your domain
+   - Secure storage for `OPENAI_API_KEY`
 
-1. Update `prisma/schema.prisma`:
+2. **Database Migration**
+   
+   For production deployment, migrate from SQLite to PostgreSQL:
+   
+   a. Update `prisma/schema.prisma`:
    ```prisma
    datasource db {
      provider = "postgresql"
      url      = env("DATABASE_URL")
    }
    ```
-
-2. Update `.env` with PostgreSQL connection string:
-   ```
+   
+   b. Update `.env` with PostgreSQL connection string:
+   ```env
    DATABASE_URL="postgresql://user:password@host:5432/database"
    ```
-
-3. Run migrations:
+   
+   c. Run migrations:
    ```bash
    npx prisma migrate dev
    ```
 
-The Prisma schema is designed to work with both SQLite and PostgreSQL with minimal changes.
+3. **Build for Production**
+   ```bash
+   npm run build
+   npm start
+   ```
 
-## Troubleshooting
+4. **Security**
+   - Enable HTTPS
+   - Configure CORS appropriately
+   - Set secure session cookies
+   - Implement rate limiting
+   - Regular security audits
 
-### Google OAuth Error: "device_id and device_name are required"
-
-If you see this error when trying to sign in:
-
-```
-Access blocked: Authorization Error
-device_id and device_name are required for private IP: http://192.168.1.65:5051/auth/google/callback
-Error 400: invalid_request
-```
-
-**Solution:**
-
-1. Make sure you added `CALLBACK_URL=http://localhost:5051/auth/google/callback` to your `.env` file
-2. Access the application via `http://localhost:5051` instead of using an IP address (like `http://192.168.1.65:5051`)
-3. In Google Cloud Console, verify the authorized redirect URI is set to `http://localhost:5051/auth/google/callback`
-4. Restart your development server after updating `.env`
-
-Google OAuth blocks authentication from private IP addresses in development. Always use `localhost` for local development.
-
-### Other Common Issues
-
-**"Not authenticated" errors:**
-- Check that SESSION_SECRET is set in your `.env` file
-- Clear your browser cookies and try logging in again
-
-**Database errors:**
-- Run `npx prisma migrate dev` to ensure your database is up to date
-- Check that DATABASE_URL is correctly set in `.env`
-
-**OpenAI API errors:**
-- Verify your OPENAI_API_KEY is valid at https://platform.openai.com/api-keys
-- Check that you have available credits in your OpenAI account
-
-## Tips for Best Results
+## Best Practices
 
 ### Working with Spreadsheets
 - Upload spreadsheets early in the conversation for context
-- Use descriptive sheet names (they appear in requirements documentation)
-- Include headers in row 1 of each sheet for accurate field identification
-- Discuss the spreadsheet data with Sunny to provide context about field meanings
-- Multiple spreadsheets can be uploaded per project
+- Use descriptive sheet names (they appear in documentation)
+- Include column headers in row 1 for accurate field identification
+- Discuss the spreadsheet data to provide context about field meanings
 
 ### Working with Images
 - Upload screenshots of existing systems, mockups, or diagrams
-- The AI will analyze and describe what it sees
-- Images help Sunny understand visual requirements and workflows
-- Clear, high-contrast images work best
+- Use clear, high-contrast images for better AI analysis
+- Images help the AI understand visual requirements and workflows
 
 ### Extracting Requirements
-- Have a thorough conversation before extracting requirements
+- Conduct a thorough conversation before extracting requirements
 - Discuss pain points, goals, users, and workflows
-- Upload relevant files during the conversation
+- Upload all relevant files during the conversation
 - All context is preserved and included in the extraction
 
-## Future Enhancements
+## Development
 
-- Multiple companies per user
-- Team collaboration features
-- PDF export for requirements
-- Version control for requirements
-- Integration with VSol Admin app
-- Analytics dashboard
-- Billing per seat
-- Additional file types (Word, PDF documents)
+### Running Tests
+```bash
+npm test              # Run all tests
+npm run test:watch    # Run tests in watch mode
+```
+
+### Database Management
+```bash
+npx prisma studio     # Open database GUI
+npx prisma migrate dev    # Create new migration
+npx prisma generate   # Regenerate Prisma client
+```
+
+### Build and Start
+```bash
+npm run dev           # Development mode with hot reload
+npm run build         # Compile TypeScript
+npm start             # Production mode
+npm run backup        # Create database backup
+```
+
+## Additional Documentation
+
+Technical documentation is available in the `docs/` directory:
+
+- `backup-setup.md` - Detailed backup configuration and scheduling
+- `MERMAID_REFACTOR_SUMMARY.md` - Workflow diagram generator implementation
+- `REFINEMENT_IMPLEMENTATION.md` - AI model refinement pipeline details
+- `REFINEMENT_SUMMARY.md` - Quick reference for refinement features
+
+## License
+
+MIT

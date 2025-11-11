@@ -2,7 +2,10 @@
 export enum StoryStatus {
   OPEN = "OPEN",
   IN_PROGRESS = "IN_PROGRESS",
-  DONE = "DONE"
+  READY_FOR_REVIEW = "READY_FOR_REVIEW",
+  IN_REVIEW = "IN_REVIEW",
+  DONE = "DONE",
+  REMOVED = "REMOVED"
 }
 
 export enum StoryPriority {
@@ -96,8 +99,15 @@ export interface UserStory {
   acceptanceCriteria: AcceptanceCriterion[];
   priority: "must-have" | "should-have" | "nice-to-have";
   effort: "small" | "medium" | "large";
-  storyPoints?: number;
-  sprint?: number;
+  team?: string;
+}
+
+export interface StatusTransition {
+  id: string;
+  userStoryId: string;
+  fromStatus: StoryStatus | null;
+  toStatus: StoryStatus;
+  transitionedAt: Date;
 }
 
 // Helper functions to convert between formats

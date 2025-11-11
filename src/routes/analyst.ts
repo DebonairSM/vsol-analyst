@@ -1,9 +1,18 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import fs from "fs";
 import { requireAuth } from "../auth/middleware";
+import { prisma } from "../utils/prisma";
+import { getAuthenticatedUser, sanitizeForPrisma } from "../utils/prisma-helpers";
+import { NotFoundError, ValidationError, logError } from "../utils/errors";
+import { asyncHandler } from "../utils/async-handler";
+import { createAttachmentResolver } from "../utils/attachment-helpers";
+import { configureSSEHeaders, sendSSEProgress, sendSSEData, sendSSEError, delay } from "../utils/sse-helpers";
+import { validateTextInput } from "../utils/validation";
+import * as constants from "../utils/constants";
+import { verifyProjectOwnership, getOrCreateChatSession, updateChatSessionHistory } from "../utils/project-helpers";
+
 import { OpenAILLMProvider } from "../llm/OpenAILLMProvider";
 import { RequirementsExtractor } from "../analyst/RequirementsExtractor";
 import { DocumentGenerator } from "../analyst/DocumentGenerator";
@@ -16,7 +25,6 @@ import { ChatMessage } from "../llm/LLMProvider";
 import { convertPriorityToDb, convertEffortToDb } from "../analyst/RequirementsTypes";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Initialize services
 const llmMini = new OpenAILLMProvider({ defaultModel: "gpt-4o-mini" });
@@ -33,23 +41,6 @@ const refinementPipeline = new RequirementsRefinementPipeline(
   docs
 );
 
-// Helper function to convert undefined values to null for JSON storage (Prisma requirement)
-const convertUndefinedToNull = (obj: any): any => {
-  if (obj === undefined) {
-    return null;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map(convertUndefinedToNull);
-  }
-  if (obj !== null && typeof obj === 'object') {
-    const converted: any = {};
-    for (const key in obj) {
-      converted[key] = convertUndefinedToNull(obj[key]);
-    }
-    return converted;
-  }
-  return obj;
-};
 const storyRefinementPipeline = new UserStoryRefinementPipeline(
   llmMini,
   llmFull,
@@ -58,148 +49,84 @@ const storyRefinementPipeline = new UserStoryRefinementPipeline(
 );
 
 // Configure multer for file uploads
+function createFileNameGenerator() {
+  return (req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${uniqueSuffix}-${file.originalname}`);
+  };
+}
+
 const imageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/images/");
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + "-" + file.originalname);
-  },
+  destination: (req, file, cb) => cb(null, constants.UPLOAD_DIR_IMAGES),
+  filename: createFileNameGenerator(),
 });
 
 const spreadsheetStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/spreadsheets/");
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + "-" + file.originalname);
-  },
+  destination: (req, file, cb) => cb(null, constants.UPLOAD_DIR_SPREADSHEETS),
+  filename: createFileNameGenerator(),
 });
 
 const uploadImage = multer({
   storage: imageStorage,
   fileFilter: (req, file, cb) => {
-    const allowedMimes = [
-      "image/png",
-      "image/jpeg",
-      "image/jpg",
-      "image/gif",
-      "image/webp",
-    ];
-    if (allowedMimes.includes(file.mimetype)) {
+    if (constants.ALLOWED_IMAGE_MIMES.includes(file.mimetype as any)) {
       cb(null, true);
     } else {
       cb(new Error("Only image files (PNG, JPG, GIF, WebP) are allowed"));
     }
   },
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
+  limits: { fileSize: constants.MAX_FILE_SIZE },
 });
 
 const uploadSpreadsheet = multer({
   storage: spreadsheetStorage,
   fileFilter: (req, file, cb) => {
-    const allowedMimes = [
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ];
-    if (allowedMimes.includes(file.mimetype)) {
+    if (constants.ALLOWED_SPREADSHEET_MIMES.includes(file.mimetype as any)) {
       cb(null, true);
     } else {
       cb(new Error("Only Excel files (.xls, .xlsx) are allowed"));
     }
   },
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
+  limits: { fileSize: constants.MAX_FILE_SIZE },
 });
 
 // Chat endpoint
-router.post("/chat", requireAuth, async (req, res) => {
-  try {
-    const { projectId, message } = req.body as {
-      projectId: string;
-      message: string;
-    };
+router.post("/chat", requireAuth, asyncHandler(async (req, res) => {
+  const user = getAuthenticatedUser(req.user);
+  const { projectId, message } = req.body;
 
-    if (!projectId || !message) {
-      return res.status(400).json({ error: "projectId and message required" });
-    }
-
-    const user = req.user as any;
-
-    // Verify project ownership
-    const project = await prisma.project.findFirst({
-      where: {
-        id: projectId,
-        company: {
-          userId: user.id,
-        },
-      },
-    });
-
-    if (!project) {
-      return res.status(404).json({ error: "Project not found" });
-    }
-
-    // Get or create chat session for this project
-    let chatSession = await prisma.chatSession.findFirst({
-      where: { projectId },
-      orderBy: { createdAt: "desc" },
-    });
-
-    let history: ChatMessage[];
-
-    if (!chatSession) {
-      // Create new session with user's first name
-      const firstName = user.name.split(" ")[0];
-      history = [{ role: "system", content: SYSTEM_PROMPT_ANALYST(firstName) }];
-      chatSession = await prisma.chatSession.create({
-        data: {
-          projectId,
-          history: JSON.stringify(history),
-        },
-      });
-    } else {
-      history = JSON.parse(chatSession.history as string) as ChatMessage[];
-    }
-
-    // Add user message
-    history.push({ role: "user", content: message });
-
-    // Create attachment resolver function
-    const resolveAttachment = async (attachmentId: string): Promise<string | null> => {
-      const attachment = await prisma.attachment.findUnique({
-        where: { id: attachmentId },
-      });
-      return attachment ? attachment.storedPath : null;
-    };
-
-    // Get AI reply with attachment resolution
-    const reply = await llmMini.chat({
-      messages: history,
-      temperature: 0.4,
-      resolveAttachment,
-    });
-
-    // Add assistant reply
-    history.push({ role: "assistant", content: reply });
-
-    // Update session in database (convert undefined to null for Prisma)
-    await prisma.chatSession.update({
-      where: { id: chatSession.id },
-      data: { history: JSON.stringify(convertUndefinedToNull(history)) },
-    });
-
-    res.json({ reply });
-  } catch (error) {
-    console.error("Error in chat:", error);
-    res.status(500).json({ error: "Chat failed" });
+  if (!projectId || typeof projectId !== "string") {
+    throw new ValidationError("projectId is required");
   }
-});
+  if (!message || typeof message !== "string") {
+    throw new ValidationError("message is required");
+  }
+
+  // Verify project ownership
+  await verifyProjectOwnership(projectId, user.id);
+
+  // Get or create chat session
+  const firstName = user.name.split(" ")[0];
+  const session = await getOrCreateChatSession(projectId, firstName);
+
+  // Add user message
+  session.history.push({ role: "user", content: message });
+
+  // Get AI reply
+  const reply = await llmMini.chat({
+    messages: session.history,
+    temperature: constants.DEFAULT_TEMPERATURE_CHAT,
+    resolveAttachment: createAttachmentResolver(),
+  });
+
+  // Add assistant reply
+  session.history.push({ role: "assistant", content: reply });
+
+  // Update session
+  await updateChatSessionHistory(session.id, session.history);
+
+  res.json({ reply });
+}));
 
 // Extract requirements endpoint
 router.post("/extract", requireAuth, async (req, res) => {
@@ -350,6 +277,9 @@ router.post("/extract-stream", requireAuth, async (req, res) => {
         where: { id: projectId },
         data: {
           generatedRequirements: result.requirements as any,
+          requirementsMarkdown: result.markdown,
+          requirementsMermaid: result.mermaid,
+          requirementsExtractedAt: new Date(),
         },
       });
       
@@ -379,6 +309,86 @@ router.post("/extract-stream", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Error in extract-stream:", error);
     res.status(500).json({ error: "Extraction failed" });
+  }
+});
+
+// Get saved requirements for a project
+router.get("/requirements/:projectId", requireAuth, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const user = req.user as any;
+
+    // Verify project ownership
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        company: {
+          userId: user.id,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        generatedRequirements: true,
+        generatedUserStories: true,
+        requirementsMarkdown: true,
+        requirementsMermaid: true,
+        detailedFlowchartMermaid: true,
+        seedData: true,
+        requirementsExtractedAt: true,
+        sessions: {
+          orderBy: { updatedAt: "desc" },
+          take: 1,
+          select: {
+            updatedAt: true,
+          },
+        },
+        userStories: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    if (!project.generatedRequirements) {
+      return res.status(404).json({ error: "No requirements found" });
+    }
+
+    // Check if requirements might be outdated
+    const lastMessageTime = project.sessions[0]?.updatedAt;
+    const isStale = lastMessageTime && project.requirementsExtractedAt 
+      ? new Date(lastMessageTime) > new Date(project.requirementsExtractedAt)
+      : false;
+
+    // Generate user stories markdown if user stories exist
+    let userStoriesMarkdown = "";
+    if (project.generatedUserStories && project.userStories.length > 0) {
+      try {
+        userStoriesMarkdown = docs.generateUserStoriesMarkdown(project.generatedUserStories as any);
+      } catch (error) {
+        console.error("Error generating user stories markdown:", error);
+      }
+    }
+
+    res.json({
+      requirements: project.generatedRequirements,
+      markdown: project.requirementsMarkdown || "",
+      mermaid: project.requirementsMermaid || "",
+      detailedFlowchart: project.detailedFlowchartMermaid || "",
+      seedData: project.seedData,
+      hasUserStories: project.userStories.length > 0,
+      userStoriesMarkdown,
+      extractedAt: project.requirementsExtractedAt,
+      isStale,
+    });
+  } catch (error) {
+    console.error("Error fetching requirements:", error);
+    res.status(500).json({ error: "Failed to fetch requirements" });
   }
 });
 
@@ -584,8 +594,7 @@ router.post("/generate-stories-stream", requireAuth, async (req, res) => {
                 benefit: story.benefit,
                 priority: convertPriorityToDb(story.priority),
                 effort: convertEffortToDb(story.effort),
-                storyPoints: story.storyPoints,
-                sprint: story.sprint,
+                team: "Team Sunny",
                 acceptanceCriteria: (story.acceptanceCriteria || []) as any,
                 epicId: dbEpic.id,
                 projectId: projectId,
@@ -650,10 +659,30 @@ router.post("/generate-flowchart-from-requirements", requireAuth, async (req, re
 // Generate flowchart with progress streaming
 router.post("/generate-flowchart-stream", requireAuth, async (req, res) => {
   try {
-    const { requirements } = req.body;
+    const { requirements, projectId } = req.body;
 
     if (!requirements) {
       return res.status(400).json({ error: "requirements object required" });
+    }
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId required" });
+    }
+
+    const user = req.user as any;
+
+    // Verify project ownership
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        company: {
+          userId: user.id,
+        },
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
     }
 
     // Set up SSE headers
@@ -695,6 +724,14 @@ router.post("/generate-flowchart-stream", requireAuth, async (req, res) => {
        
        sendProgress(95, "Completing...");
        
+       // Save detailed flowchart to database
+       await prisma.project.update({
+         where: { id: projectId },
+         data: {
+           detailedFlowchartMermaid: mermaidDiagram,
+         },
+       });
+       
        // Wait a moment before 100%
        await new Promise(resolve => setTimeout(resolve, 1000));
        
@@ -709,6 +746,7 @@ router.post("/generate-flowchart-stream", requireAuth, async (req, res) => {
         complete: true,
         mermaidDiagram,
         markdown,
+        saved: true,
       })}\n\n`);
       res.end();
     } catch (error) {
@@ -723,33 +761,20 @@ router.post("/generate-flowchart-stream", requireAuth, async (req, res) => {
 });
 
 // Polish text endpoint
-router.post("/polish", requireAuth, async (req, res) => {
-  try {
-    const { text } = req.body as { text: string };
+router.post("/polish", requireAuth, asyncHandler(async (req, res) => {
+  const text = validateTextInput(req.body.text);
 
-    if (!text || typeof text !== "string") {
-      return res.status(400).json({ error: "text is required" });
-    }
+  // Use the LLM to polish the text
+  const polished = await llmMini.chat({
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT_POLISHER },
+      { role: "user", content: text },
+    ],
+    temperature: constants.DEFAULT_TEMPERATURE_POLISH,
+  });
 
-    if (text.trim().length === 0) {
-      return res.status(400).json({ error: "text cannot be empty" });
-    }
-
-    // Use the LLM to polish the text
-    const polished = await llmMini.chat({
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT_POLISHER },
-        { role: "user", content: text },
-      ],
-      temperature: 0.3,
-    });
-
-    res.json({ original: text, polished: polished.trim() });
-  } catch (error) {
-    console.error("Error polishing text:", error);
-    res.status(500).json({ error: "Polishing failed" });
-  }
-});
+  res.json({ original: text, polished: polished.trim() });
+}));
 
 // Upload Excel file endpoint
 router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), async (req, res) => {
@@ -908,7 +933,7 @@ router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), asyn
     // Save the updated history (convert undefined to null for Prisma)
     await prisma.chatSession.update({
       where: { id: chatSession.id },
-      data: { history: JSON.stringify(convertUndefinedToNull(history)) },
+      data: { history: JSON.stringify(sanitizeForPrisma(history)) },
     });
 
     res.json({
@@ -977,6 +1002,193 @@ router.get("/get-spreadsheet-data/:attachmentId", requireAuth, async (req, res) 
   }
 });
 
+// Generate and save seed data endpoint
+router.post("/generate-seed-data", requireAuth, async (req, res) => {
+  try {
+    const { projectId, attachmentId, format } = req.body;
+
+    if (!projectId || !attachmentId || !format) {
+      return res.status(400).json({ error: "projectId, attachmentId, and format are required" });
+    }
+
+    if (!['json', 'sql', 'csv'].includes(format)) {
+      return res.status(400).json({ error: "format must be json, sql, or csv" });
+    }
+
+    const user = req.user as any;
+
+    // Verify project ownership and get attachment
+    const attachment = await prisma.attachment.findUnique({
+      where: { id: attachmentId },
+      include: {
+        session: {
+          include: {
+            project: {
+              include: {
+                company: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!attachment) {
+      return res.status(404).json({ error: "Attachment not found" });
+    }
+
+    if (attachment.session.project.company.userId !== user.id) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (attachment.fileType !== "spreadsheet") {
+      return res.status(400).json({ error: "Attachment must be a spreadsheet" });
+    }
+
+    // Generate seed data in requested format
+    let seedData: any;
+    let contentType: string;
+    let fileExtension: string;
+
+    const parsedData = attachment.parsedData as any;
+
+    switch (format) {
+      case 'json':
+        seedData = JSON.stringify(parsedData, null, 2);
+        contentType = 'application/json';
+        fileExtension = 'json';
+        break;
+
+      case 'sql':
+        let sql = '-- Seed Data SQL\n';
+        sql += `-- Generated from: ${attachment.filename}\n`;
+        sql += `-- Date: ${new Date().toISOString()}\n\n`;
+        
+        Object.keys(parsedData).forEach(sheetName => {
+          const sheetData = parsedData[sheetName];
+          
+          if (sheetData.length === 0) return;
+          
+          const tableName = sheetName.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+          sql += `-- Table: ${tableName}\n`;
+          
+          const headers = sheetData[0];
+          const dataRows = sheetData.slice(1);
+          
+          if (headers && headers.length > 0 && dataRows.length > 0) {
+            const columns = headers.map((h: any, idx: number) => 
+              h ? String(h).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase() : `column_${idx + 1}`
+            );
+            
+            dataRows.forEach((row: any[]) => {
+              const values = row.map(val => {
+                if (val === null || val === undefined || val === '') return 'NULL';
+                if (typeof val === 'number') return val;
+                return `'${String(val).replace(/'/g, "''")}'`;
+              });
+              
+              sql += `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${values.join(', ')});\n`;
+            });
+            
+            sql += '\n';
+          }
+        });
+        
+        seedData = sql;
+        contentType = 'text/plain';
+        fileExtension = 'sql';
+        break;
+
+      case 'csv':
+        // For CSV, we'll store all sheets in a JSON structure
+        const csvData: any = {};
+        Object.keys(parsedData).forEach(sheetName => {
+          const sheetData = parsedData[sheetName];
+          
+          if (sheetData.length === 0) return;
+          
+          let csv = '';
+          sheetData.forEach((row: any[]) => {
+            const csvRow = row.map(cell => {
+              if (cell === null || cell === undefined) return '';
+              const cellStr = String(cell);
+              if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                return `"${cellStr.replace(/"/g, '""')}"`;
+              }
+              return cellStr;
+            });
+            csv += csvRow.join(',') + '\n';
+          });
+          
+          csvData[sheetName] = csv;
+        });
+        
+        seedData = JSON.stringify(csvData);
+        contentType = 'application/json';
+        fileExtension = 'csv';
+        break;
+    }
+
+    // Save seed data to project
+    await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        seedData: {
+          format,
+          attachmentId,
+          filename: attachment.filename,
+          data: seedData,
+          generatedAt: new Date().toISOString(),
+        } as any,
+      },
+    });
+
+    res.json({
+      success: true,
+      format,
+      data: seedData,
+      filename: `${attachment.filename.replace(/\.[^/.]+$/, '')}-seed-data.${fileExtension}`,
+    });
+  } catch (error) {
+    console.error("Error generating seed data:", error);
+    res.status(500).json({ error: "Failed to generate seed data" });
+  }
+});
+
+// Get saved seed data for a project
+router.get("/seed-data/:projectId", requireAuth, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const user = req.user as any;
+
+    // Verify project ownership
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        company: {
+          userId: user.id,
+        },
+      },
+      select: {
+        seedData: true,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    if (!project.seedData) {
+      return res.status(404).json({ error: "No seed data found" });
+    }
+
+    res.json(project.seedData);
+  } catch (error) {
+    console.error("Error fetching seed data:", error);
+    res.status(500).json({ error: "Failed to fetch seed data" });
+  }
+});
+
 // Upload image file endpoint
 router.post("/upload-image", requireAuth, uploadImage.single("file"), async (req, res) => {
   try {
@@ -1030,13 +1242,13 @@ router.post("/upload-image", requireAuth, uploadImage.single("file"), async (req
 
     // Create Attachment record
     const attachment = await prisma.attachment.create({
-      data: convertUndefinedToNull({
+      data: sanitizeForPrisma({
         filename: req.file.originalname,
         storedPath: req.file.path,
         fileType: "image",
         mimeType: req.file.mimetype,
         sessionId: chatSession.id,
-      }) as any,
+      }),
     });
 
     // Convert image to base64 data URL for vision analysis
@@ -1090,7 +1302,7 @@ router.post("/upload-image", requireAuth, uploadImage.single("file"), async (req
     // Save the updated history (convert undefined to null for Prisma)
     await prisma.chatSession.update({
       where: { id: chatSession.id },
-      data: { history: JSON.stringify(convertUndefinedToNull(history)) },
+      data: { history: JSON.stringify(sanitizeForPrisma(history)) },
     });
 
     res.json({
