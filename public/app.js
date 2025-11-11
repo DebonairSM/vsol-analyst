@@ -93,6 +93,8 @@ async function init() {
                 }
             } else if (hash === '#/admin' && currentUser.isAdmin) {
                 showAdminDashboard();
+            } else if (hash === '#/settings') {
+                showSettings();
             } else {
                 showProjects();
             }
@@ -2820,6 +2822,8 @@ window.addEventListener('popstate', () => {
         }
     } else if (hash === '#/admin' && currentUser.isAdmin) {
         showAdminDashboard();
+    } else if (hash === '#/settings') {
+        showSettings();
     } else {
         showProjects();
     }

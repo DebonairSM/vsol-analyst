@@ -59,6 +59,10 @@ VSol Analyst is a web-based application that facilitates requirements gathering 
    # Session Secret
    SESSION_SECRET=random-secret-string-change-in-production
    
+   # Optional: Server configuration
+   PORT=5051
+   HOST=0.0.0.0  # Listen on all interfaces (allows network access)
+   
    # Optional: Custom backup location
    BACKUP_PATH=C:\custom\backup\path
    ```
@@ -77,8 +81,12 @@ VSol Analyst is a web-based application that facilitates requirements gathering 
       - Navigate to "APIs & Services" > "Credentials"
       - Click "Create Credentials" > "OAuth client ID"
       - Select "Web application"
-      - Add authorized redirect URI: `http://localhost:5051/auth/google/callback`
+      - Add authorized redirect URIs:
+        - `http://localhost:5051/auth/google/callback` (for local development)
+        - `http://vsol-aurora:5051/auth/google/callback` (if using custom DNS name)
       - Copy the Client ID and Client Secret to your `.env` file
+   
+   **Note:** You can add multiple redirect URIs to support different hostnames. Just ensure the `CALLBACK_URL` in your `.env` matches one of them.
 
 5. **Get OpenAI API Key**
    
@@ -123,7 +131,10 @@ VSol Analyst is a web-based application that facilitates requirements gathering 
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | Yes |
 | `CALLBACK_URL` | OAuth callback URL | Yes |
 | `SESSION_SECRET` | Session encryption secret | Yes |
+| `PORT` | Server port (defaults to 5051) | No |
+| `HOST` | Server host binding (defaults to 0.0.0.0) | No |
 | `BACKUP_PATH` | Custom backup directory path | No |
+| `MCP_API_KEY` | API key for MCP server HTTP mode | No |
 
 ### Model Configuration
 
@@ -435,6 +446,17 @@ vsol-analyst/
 
 ## Troubleshooting
 
+### Using Custom DNS Names or Hostnames
+
+If you need to access the application via a custom DNS name (e.g., `http://vsol-aurora`) instead of localhost:
+
+1. Update `CALLBACK_URL` in your `.env` file:
+   ```env
+   CALLBACK_URL=http://vsol-aurora:5051/auth/google/callback
+   ```
+2. Add the same URL to Google Cloud Console authorized redirect URIs
+3. Restart the application
+
 ### Google OAuth Error: "device_id and device_name are required"
 
 This error occurs when accessing the application via a private IP address instead of localhost.
@@ -554,15 +576,6 @@ npm run build         # Compile TypeScript
 npm start             # Production mode
 npm run backup        # Create database backup
 ```
-
-## Additional Documentation
-
-Technical documentation is available in the `docs/` directory:
-
-- `backup-setup.md` - Detailed backup configuration and scheduling
-- `MERMAID_REFACTOR_SUMMARY.md` - Workflow diagram generator implementation
-- `REFINEMENT_IMPLEMENTATION.md` - AI model refinement pipeline details
-- `REFINEMENT_SUMMARY.md` - Quick reference for refinement features
 
 ## License
 

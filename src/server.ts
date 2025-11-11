@@ -183,6 +183,13 @@ console.log("✓ Hourly backup scheduler initialized");
 
 // Make port configurable via environment variable
 const PORT = Number(process.env.PORT) || 5051;
-app.listen(PORT, () => {
-  console.log(`VSol Analyst Agent running on http://localhost:${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
+  console.log(`VSol Analyst Agent running on:`);
+  console.log(`  - http://localhost:${PORT}`);
+  console.log(`  - http://127.0.0.1:${PORT}`);
+  if (HOST === '0.0.0.0') {
+    console.log(`  - http://vsol-aurora:${PORT} (if DNS configured)`);
+  }
 });
