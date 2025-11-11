@@ -355,8 +355,20 @@ router.get("/requirements/:projectId", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Project not found" });
     }
 
+    // If no requirements exist yet, return empty state instead of 404
     if (!project.generatedRequirements) {
-      return res.status(404).json({ error: "No requirements found" });
+      return res.json({
+        requirements: null,
+        markdown: "",
+        mermaid: "",
+        detailedFlowchart: "",
+        seedData: null,
+        hasUserStories: false,
+        userStoriesMarkdown: "",
+        extractedAt: null,
+        isStale: false,
+        isEmpty: true,
+      });
     }
 
     // Check if requirements might be outdated
@@ -385,6 +397,7 @@ router.get("/requirements/:projectId", requireAuth, async (req, res) => {
       userStoriesMarkdown,
       extractedAt: project.requirementsExtractedAt,
       isStale,
+      isEmpty: false,
     });
   } catch (error) {
     console.error("Error fetching requirements:", error);

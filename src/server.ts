@@ -5,8 +5,10 @@ import express, { Request, Response, NextFunction } from "express";
 import session from "express-session";
 import path from "path";
 import multer from "multer";
+import cron from "node-cron";
 import passport from "./auth/passport";
 import { AppError, logError } from "./utils/errors";
+import { backupDatabase } from "./backup/database-backup";
 
 // Import route modules
 import authRoutes from "./routes/auth";
@@ -161,6 +163,21 @@ process.on("uncaughtException", (error: Error) => {
     process.exit(1);
   }
 });
+
+// Schedule hourly database backups while app is running
+// Runs at the top of every hour (e.g., 1:00, 2:00, 3:00)
+cron.schedule("0 * * * *", async () => {
+  console.log(`[${new Date().toISOString()}] Running scheduled database backup...`);
+  try {
+    await backupDatabase();
+  } catch (error) {
+    console.error("Scheduled backup failed:", error);
+  }
+}, {
+  timezone: "America/New_York" // Adjust to your timezone if needed
+});
+
+console.log("✓ Hourly backup scheduler initialized");
 
 // Make port configurable via environment variable
 const PORT = Number(process.env.PORT) || 5051;

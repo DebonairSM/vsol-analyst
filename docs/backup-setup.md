@@ -1,10 +1,21 @@
 # Database Backup Setup
 
-This document explains how to backup the VSol Analyst database to OneDrive.
+This document explains the backup strategy for the VSol Analyst database.
+
+## Automated Backup
+
+The application automatically backs up the database every hour while running. Backups are scheduled using node-cron and run at the top of each hour (e.g., 1:00, 2:00, 3:00).
+
+- **Schedule**: Hourly (when application is running)
+- **Location**: `%USERPROFILE%\OneDrive\Documents\vsol-analyst-backups\`
+- **Format**: Timestamped files (e.g., `dev-2025-11-07_14-30-00.db`)
+- **Retention**: 10 most recent backups (older ones are automatically deleted)
+
+The backup scheduler is initialized when the server starts and runs in the background.
 
 ## Manual Backup
 
-To create a backup manually, run:
+To create a backup manually at any time, run:
 
 ```bash
 npm run backup
@@ -12,7 +23,7 @@ npm run backup
 
 This will:
 - Copy the database to your OneDrive Documents folder
-- Create a timestamped backup file (e.g., `dev-2025-11-07_14-30-00.db`)
+- Create a timestamped backup file
 - Keep the 10 most recent backups (older ones are automatically deleted)
 
 Default backup location: `%USERPROFILE%\OneDrive\Documents\vsol-analyst-backups\`
@@ -25,50 +36,26 @@ To use a different backup location, set the `BACKUP_PATH` environment variable i
 BACKUP_PATH=C:\custom\backup\path
 ```
 
-## Scheduled Automatic Backups
+## How It Works
 
-### Option 1: Windows Task Scheduler (Recommended)
-
-1. Open Task Scheduler (search for "Task Scheduler" in Windows)
-
-2. Click "Create Basic Task" in the right panel
-
-3. Configure the task:
-   - **Name**: VSol Database Backup
-   - **Description**: Backup VSol Analyst database to OneDrive
-   - **Trigger**: Daily (or your preferred schedule)
-   - **Time**: Choose a time when the application is not heavily used
-   - **Action**: Start a program
-   - **Program/script**: Browse to `C:\git\vsol-analyst\backup.bat` (adjust path to match your installation)
-   - **Start in**: Leave empty (the batch file handles this)
-
-4. Click Finish
-
-Alternatively, you can configure it manually:
-   - **Program/script**: `C:\Program Files\nodejs\node.exe`
-   - **Add arguments**: `node_modules\.bin\tsx src\backup\database-backup.ts`
-   - **Start in**: Your project directory (e.g., `C:\git\vsol-analyst`)
-
-### Option 2: Run at Application Startup
-
-To backup when starting the server, modify `src/server.ts`:
+The backup system is implemented in `src/server.ts` using node-cron:
 
 ```typescript
-import { backupDatabase } from './backup/database-backup';
+import cron from "node-cron";
+import { backupDatabase } from "./backup/database-backup";
 
-// Add after imports
-backupDatabase().catch(err => console.error('Startup backup failed:', err));
+// Schedule hourly backups at the top of each hour
+cron.schedule("0 * * * *", async () => {
+  console.log(`[${new Date().toISOString()}] Running scheduled database backup...`);
+  try {
+    await backupDatabase();
+  } catch (error) {
+    console.error("Scheduled backup failed:", error);
+  }
+});
 ```
 
-### Option 3: Scheduled NPM Package
-
-Install a task scheduler for Node.js:
-
-```bash
-npm install node-cron
-```
-
-Then create a scheduled task in your application code.
+This approach ensures backups run automatically while the application is active. When the application is stopped, backups do not run.
 
 ## Backup Configuration
 

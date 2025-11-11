@@ -218,50 +218,56 @@ async function showRequirementsPage() {
     // Load requirements
     try {
         const response = await fetch(`/analyst/requirements/${currentProject.id}`);
-        if (response.ok) {
-            const data = await response.json();
-            
-            // Check if markdown/mermaid are empty (legacy requirements need refresh)
-            if (!data.markdown || !data.mermaid) {
-                // Show message and auto-refresh
-                document.getElementById('requirements-loading').style.display = 'block';
-                document.getElementById('requirements-content').style.display = 'none';
-                
-                // Wait a moment then refresh
-                setTimeout(() => {
-                    refreshRequirementsOnPage();
-                }, 100);
-                return;
-            }
-            
-            requirementsMarkdownOutput.value = data.markdown;
-            requirementsMermaidOutput.value = data.mermaid;
-            cachedRequirements = data.requirements;
-            
-            // Load detailed flowchart if it exists
-            if (data.detailedFlowchart) {
-                const flowchartOutput = document.getElementById('requirements-detailed-flowchart-output');
-                const flowchartOutputDiv = document.getElementById('requirements-flowchart-output');
-                const flowchartBtn = document.getElementById('requirements-generate-flowchart-btn');
-                
-                if (flowchartOutput && flowchartOutputDiv && flowchartBtn) {
-                    flowchartOutput.value = data.detailedFlowchart;
-                    flowchartOutputDiv.style.display = 'block';
-                    flowchartBtn.style.display = 'none';
-                }
-            }
-            
-            // Load user stories if they exist
-            if (data.hasUserStories && data.userStoriesMarkdown) {
-                loadExistingUserStories(data.userStoriesMarkdown);
-            }
-            
-            document.getElementById('requirements-content').style.display = 'block';
-            document.getElementById('requirements-loading').style.display = 'none';
-        } else {
-            alert('No requirements found. Please extract requirements first.');
-            returnToChat();
+        if (!response.ok) {
+            throw new Error(`Failed to load requirements: ${response.status}`);
         }
+        
+        const data = await response.json();
+        
+        // Check if requirements are empty (not yet generated)
+        if (data.isEmpty) {
+            alert('No requirements found for this project. Please chat with the analyst to generate requirements, then click "Extract Requirements".');
+            returnToChat();
+            return;
+        }
+        
+        // Check if markdown/mermaid are empty (legacy requirements need refresh)
+        if (!data.markdown || !data.mermaid) {
+            // Show message and auto-refresh
+            document.getElementById('requirements-loading').style.display = 'block';
+            document.getElementById('requirements-content').style.display = 'none';
+            
+            // Wait a moment then refresh
+            setTimeout(() => {
+                refreshRequirementsOnPage();
+            }, 100);
+            return;
+        }
+        
+        requirementsMarkdownOutput.value = data.markdown;
+        requirementsMermaidOutput.value = data.mermaid;
+        cachedRequirements = data.requirements;
+        
+        // Load detailed flowchart if it exists
+        if (data.detailedFlowchart) {
+            const flowchartOutput = document.getElementById('requirements-detailed-flowchart-output');
+            const flowchartOutputDiv = document.getElementById('requirements-flowchart-output');
+            const flowchartBtn = document.getElementById('requirements-generate-flowchart-btn');
+            
+            if (flowchartOutput && flowchartOutputDiv && flowchartBtn) {
+                flowchartOutput.value = data.detailedFlowchart;
+                flowchartOutputDiv.style.display = 'block';
+                flowchartBtn.style.display = 'none';
+            }
+        }
+        
+        // Load user stories if they exist
+        if (data.hasUserStories && data.userStoriesMarkdown) {
+            loadExistingUserStories(data.userStoriesMarkdown);
+        }
+        
+        document.getElementById('requirements-content').style.display = 'block';
+        document.getElementById('requirements-loading').style.display = 'none';
     } catch (error) {
         console.error('Error loading requirements:', error);
         alert('Failed to load requirements');

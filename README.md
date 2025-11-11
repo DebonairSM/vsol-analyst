@@ -17,7 +17,7 @@ VSol Analyst is a web-based application that facilitates requirements gathering 
 - Mermaid workflow diagram generation
 - Admin dashboard for monitoring client sessions
 - Persistent chat history per project
-- Automated database backups
+- Automated hourly database backups to OneDrive
 
 ## Installation
 
@@ -180,12 +180,25 @@ Refinement triggers:
 npx prisma studio
 ```
 
-**Create database backup:**
+**Database Backups:**
+
+The system automatically backs up the database every hour while the application is running.
+
+- **Backup Location**: `%USERPROFILE%\OneDrive\Documents\vsol-analyst-backups\`
+- **Frequency**: Hourly (at the top of each hour when app is running)
+- **Retention**: 10 most recent backups
+- **Format**: Timestamped SQLite files (e.g., `dev-2025-11-07_14-30-00.db`)
+
+**Manual backup:**
 ```bash
 npm run backup
 ```
 
-Backups are stored in `%USERPROFILE%\OneDrive\Documents\vsol-analyst-backups\` by default. The system retains the 10 most recent backups.
+**Custom backup location:**
+Add to your `.env` file:
+```env
+BACKUP_PATH=C:\custom\backup\path
+```
 
 **Restore from backup:**
 1. Stop the server
@@ -341,6 +354,7 @@ The MCP server runs independently from the main web application and provides rea
 - **AI Models**: OpenAI GPT-4 and GPT-4o-mini
 - **Session Management**: express-session
 - **File Processing**: Multer for uploads, xlsx for spreadsheet analysis
+- **Backup Scheduling**: node-cron for automated hourly backups
 
 ### Project Structure
 
