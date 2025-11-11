@@ -196,7 +196,22 @@ Backups are stored in `%USERPROFILE%\OneDrive\Documents\vsol-analyst-backups\` b
 
 Sunny includes a Model Context Protocol (MCP) server that enables programmatic access to project data through Cursor and other MCP-compatible tools.
 
-### Setup MCP Server
+### Two Operating Modes
+
+The MCP server can run in two modes:
+
+#### Mode 1: Direct Database Access (Default)
+- Accesses the SQLite database directly
+- **Cannot run simultaneously with the dev server** (SQLite locking issue)
+- Use for standalone MCP access when dev server is not running
+
+#### Mode 2: HTTP API (Recommended for Development)
+- Calls the dev server's REST API
+- **Can run alongside the dev server** without conflicts
+- Requires dev server to be running
+- Uses API key authentication
+
+### Setup Mode 1: Direct Database Access
 
 1. **Start the MCP server**
    ```bash
@@ -221,6 +236,42 @@ Sunny includes a Model Context Protocol (MCP) server that enables programmatic a
      }
    }
    ```
+
+### Setup Mode 2: HTTP API (Recommended)
+
+1. **Add MCP_API_KEY to your `.env` file**
+   ```env
+   MCP_API_KEY=your-secure-random-api-key-here
+   ```
+   Generate a secure random string for the API key.
+
+2. **Start the dev server**
+   ```bash
+   npm run dev
+   ```
+
+3. **Configure in Cursor**
+   
+   Add to Cursor settings (Settings > Features > Model Context Protocol):
+   
+   After building the project (`npm run build`), use:
+   
+   ```json
+   {
+     "mcpServers": {
+       "sunny": {
+         "command": "node",
+         "args": ["C:\\git\\vsol-analyst\\dist\\mcp\\server-http.js"],
+         "env": {
+           "MCP_API_KEY": "your-secure-random-api-key-here",
+           "API_BASE_URL": "http://localhost:5051"
+         }
+       }
+     }
+   }
+   ```
+   
+   Replace the path with your actual project path.
 
 ### Available MCP Tools
 

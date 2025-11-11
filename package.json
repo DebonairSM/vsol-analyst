@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "mcp": "tsx src/mcp/server.ts",
+    "mcp:http": "tsx src/mcp/server-http.ts",
     "backup": "tsx src/backup/database-backup.ts",
     "test": "jest",
     "test:watch": "jest --watch"
