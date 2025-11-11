@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerResources } from "./resources";
@@ -38,7 +39,9 @@ export async function startMCPServer() {
   // Connect server to transport
   await server.connect(transport);
 
-  console.log("Sunny MCP server running on stdio");
+  // Don't use console.log here - stdio is used for MCP JSON communication
+  // Any non-JSON output will break the protocol
+  console.error("Sunny MCP server running on stdio"); // stderr is safe
 
   return server;
 }
