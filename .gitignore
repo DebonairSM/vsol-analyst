@@ -6,8 +6,10 @@ dist/
 *.tsbuildinfo
 
 # Database files
-prisma/*.db
-prisma/*.db-journal
+prisma/**/*.db
+prisma/**/*.db-journal
+*.db
+*.db-journal
 
 # Environment variables
 .env
@@ -48,6 +50,7 @@ Desktop.ini
 # Temporary files
 *.tmp
 .cache/
+temp/
 
 # Test files
 test-*.xlsx

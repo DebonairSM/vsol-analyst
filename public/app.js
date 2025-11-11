@@ -152,10 +152,12 @@ function showLogin() {
 }
 
 function showProjects() {
+    const settingsPage = document.getElementById('settings-page');
     loginPage.classList.add('hidden');
     projectsPage.classList.add('visible');
     adminPage.style.display = 'none';
     chatPage.classList.remove('visible');
+    if (settingsPage) settingsPage.style.display = 'none';
     userHeader.style.display = 'flex';
     userName.textContent = currentUser.name;
     
@@ -177,6 +179,7 @@ function showProjects() {
 }
 
 async function showChat(project) {
+    const settingsPage = document.getElementById('settings-page');
     currentProject = project;
     projectTitle.textContent = project.name;
     chatContainer.innerHTML = '';
@@ -187,6 +190,7 @@ async function showChat(project) {
     adminPage.style.display = 'none';
     chatPage.classList.add('visible');
     requirementsPage.classList.remove('visible');
+    if (settingsPage) settingsPage.style.display = 'none';
     
     // Update URL
     if (!isInitialLoad) {
@@ -203,11 +207,13 @@ async function showChat(project) {
 async function showRequirementsPage() {
     if (!currentProject) return;
     
+    const settingsPage = document.getElementById('settings-page');
     loginPage.classList.add('hidden');
     projectsPage.classList.remove('visible');
     adminPage.style.display = 'none';
     chatPage.classList.remove('visible');
     requirementsPage.classList.add('visible');
+    if (settingsPage) settingsPage.style.display = 'none';
     userHeader.style.display = 'flex';
     
     requirementsProjectTitle.textContent = `${currentProject.name} - Requirements`;
@@ -2125,10 +2131,12 @@ function downloadRequirementsFlowchart() {
 async function showAdminDashboard() {
     if (!currentUser.isAdmin) return;
     
+    const settingsPage = document.getElementById('settings-page');
     loginPage.classList.add('hidden');
     projectsPage.classList.remove('visible');
     adminPage.style.display = 'flex';
     chatPage.classList.remove('visible');
+    if (settingsPage) settingsPage.style.display = 'none';
     
     // Update URL
     if (!isInitialLoad) {
