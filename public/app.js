@@ -1011,22 +1011,31 @@ async function updateRequirementsButtonStates() {
         if (response.ok) {
             const data = await response.json();
             
-            // Hide Extract button, show Open and Refresh buttons
-            extractBtn.style.display = 'none';
-            openRequirementsBtn.style.display = 'inline-block';
-            refreshRequirementsChatBtn.style.display = 'inline-block';
-            
-            // Show staleness indicator if requirements are outdated
-            if (data.isStale) {
-                requirementsStaleIndicator.style.display = 'inline';
-            } else {
+            // Check if requirements are empty
+            if (data.isEmpty) {
+                // No requirements exist, show Extract button
+                extractBtn.style.display = 'inline-block';
+                openRequirementsBtn.style.display = 'none';
+                refreshRequirementsChatBtn.style.display = 'none';
                 requirementsStaleIndicator.style.display = 'none';
+            } else {
+                // Hide Extract button, show Open and Refresh buttons
+                extractBtn.style.display = 'none';
+                openRequirementsBtn.style.display = 'inline-block';
+                refreshRequirementsChatBtn.style.display = 'inline-block';
+                
+                // Show staleness indicator if requirements are outdated
+                if (data.isStale) {
+                    requirementsStaleIndicator.style.display = 'inline';
+                } else {
+                    requirementsStaleIndicator.style.display = 'none';
+                }
+                
+                // Cache requirements
+                cachedRequirements = data.requirements;
             }
-            
-            // Cache requirements
-            cachedRequirements = data.requirements;
         } else {
-            // No requirements exist, show Extract button
+            // Request failed, default to showing Extract button
             extractBtn.style.display = 'inline-block';
             openRequirementsBtn.style.display = 'none';
             refreshRequirementsChatBtn.style.display = 'none';
@@ -3061,6 +3070,148 @@ document.getElementById('seed-data-modal')?.addEventListener('click', (e) => {
         hideSeedDataModal();
     }
 });
+
+// ===========================
+// Settings Page Functions
+// ===========================
+
+async function showSettings() {
+    const settingsPage = document.getElementById('settings-page');
+    const projectsPage = document.getElementById('projects-page');
+    const adminPage = document.getElementById('admin-page');
+    const chatPage = document.getElementById('chat-page');
+    const requirementsPage = document.getElementById('requirements-page');
+    
+    projectsPage.classList.remove('visible');
+    adminPage.style.display = 'none';
+    chatPage.style.display = 'none';
+    requirementsPage.style.display = 'none';
+    settingsPage.style.display = 'block';
+    
+    window.location.hash = '#/settings';
+    
+    // Load backup status
+    await refreshBackupStatus();
+}
+
+async function refreshBackupStatus() {
+    try {
+        const response = await fetch('/api/system/backup-status');
+        if (!response.ok) {
+            throw new Error('Failed to fetch backup status');
+        }
+        
+        const data = await response.json();
+        
+        // Update stats
+        document.getElementById('backup-count').textContent = data.backupCount;
+        document.getElementById('backup-total-size').textContent = formatBytes(data.totalBackupSize);
+        document.getElementById('server-uptime').textContent = formatUptime(data.serverUptime);
+        document.getElementById('backup-location').textContent = data.backupLocation;
+        
+        // Update last backup info
+        const lastBackupEl = document.getElementById('last-backup-info');
+        if (data.lastBackup) {
+            const date = new Date(data.lastBackup.timestamp);
+            lastBackupEl.innerHTML = `
+                <strong>${data.lastBackup.name}</strong><br>
+                <small>${date.toLocaleString()} (${formatBytes(data.lastBackup.size)})</small>
+            `;
+        } else {
+            lastBackupEl.textContent = 'No backups yet';
+        }
+        
+        // Update backup list
+        const backupListEl = document.getElementById('backup-list');
+        if (data.backups.length === 0) {
+            backupListEl.innerHTML = '<div style="color: #7f8c8d; text-align: center; padding: 1rem;">No backups found</div>';
+        } else {
+            backupListEl.innerHTML = data.backups.map(backup => {
+                const date = new Date(backup.timestamp);
+                return `
+                    <div style="display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid #ecf0f1;">
+                        <div style="flex: 1;">
+                            <div style="font-family: monospace; font-size: 0.875rem;">${backup.name}</div>
+                            <div style="font-size: 0.75rem; color: #7f8c8d; margin-top: 0.25rem;">${date.toLocaleString()}</div>
+                        </div>
+                        <div style="text-align: right; color: #7f8c8d; font-size: 0.875rem;">
+                            ${formatBytes(backup.size)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+    } catch (error) {
+        console.error('Error fetching backup status:', error);
+        document.getElementById('backup-list').innerHTML = 
+            '<div style="color: #e74c3c; text-align: center; padding: 1rem;">Failed to load backup status</div>';
+    }
+}
+
+async function triggerBackupNow() {
+    const btn = document.getElementById('backup-now-btn');
+    const originalText = btn.innerHTML;
+    
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Creating backup...';
+        
+        const response = await fetch('/api/system/backup-now', {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Backup failed');
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            btn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Backup created!';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }, 2000);
+            
+            // Refresh the status
+            await refreshBackupStatus();
+        } else {
+            throw new Error(result.message);
+        }
+        
+    } catch (error) {
+        console.error('Error creating backup:', error);
+        btn.innerHTML = '<span class="material-symbols-outlined">error</span> Failed!';
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }, 2000);
+        alert('Failed to create backup: ' + error.message);
+    }
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function formatUptime(seconds) {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (days > 0) {
+        return `${days}d ${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    } else {
+        return `${minutes}m`;
+    }
+}
 
 // Initialize on page load
 init();

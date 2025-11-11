@@ -17,6 +17,7 @@ import attachmentRoutes from "./routes/attachments";
 import adminRoutes from "./routes/admin";
 import analystRoutes from "./routes/analyst";
 import mcpApiRoutes from "./routes/mcp-api";
+import systemRoutes from "./routes/system";
 
 const app = express();
 const isProd = process.env.NODE_ENV === "production";
@@ -79,6 +80,7 @@ app.use("/api/attachments", attachmentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/analyst", analystRoutes);
 app.use("/api/mcp", mcpApiRoutes); // MCP server API endpoints
+app.use("/api/system", systemRoutes); // System status and management
 
 // Global error handler (must be last middleware)
 app.use((

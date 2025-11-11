@@ -1616,6 +1616,10 @@
                     </div>
                     <span id="admin-badge" class="admin-role-badge" style="display: none;">Agentic Master</span>
                 </div>
+                <button class="logout-btn" onclick="showSettings()" style="margin-right: 0.5rem;">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">settings</span>
+                    Settings
+                </button>
                 <button class="logout-btn" onclick="logout()">Logout</button>
             </div>
         </div>
@@ -1688,6 +1692,76 @@
 
             <div id="admin-content" style="background: white; border-radius: 8px; padding: 1.5rem; flex: 1; overflow-y: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                 <div class="empty-state">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Settings Page -->
+        <div id="settings-page" style="display: none;">
+            <div class="projects-header">
+                <h2>System Settings</h2>
+                <button class="back-btn" onclick="backToProjects()">← Back to Projects</button>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1rem;">
+                <h3 style="margin-bottom: 1rem; color: #2C3E50;">Database Backup Status</h3>
+                
+                <div class="admin-stats-grid" style="margin-bottom: 1.5rem;">
+                    <div class="stat-card">
+                        <div class="stat-label">Backup Frequency</div>
+                        <div id="backup-frequency" class="stat-value">Hourly</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Backups</div>
+                        <div id="backup-count" class="stat-value">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Size</div>
+                        <div id="backup-total-size" class="stat-value">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Server Uptime</div>
+                        <div id="server-uptime" class="stat-value">-</div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; margin-bottom: 1.5rem;">
+                    <div>
+                        <label style="display: block; color: #7f8c8d; font-size: 0.875rem; margin-bottom: 0.25rem;">Backup Location</label>
+                        <div id="backup-location" style="font-family: monospace; font-size: 0.875rem; color: #2C3E50; background: #f8f9fa; padding: 0.5rem; border-radius: 4px; word-break: break-all;">Loading...</div>
+                    </div>
+                    <div>
+                        <label style="display: block; color: #7f8c8d; font-size: 0.875rem; margin-bottom: 0.25rem;">Last Backup</label>
+                        <div id="last-backup-info" style="font-size: 0.875rem; color: #2C3E50; background: #f8f9fa; padding: 0.5rem; border-radius: 4px;">No backups yet</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+                    <button id="backup-now-btn" class="new-project-btn" onclick="triggerBackupNow()" style="background: #3498db;">
+                        <span class="material-symbols-outlined">backup</span>
+                        Create Backup Now
+                    </button>
+                    <button onclick="refreshBackupStatus()" style="padding: 0.5rem 1rem; background: #ecf0f1; color: #2C3E50; border: none; border-radius: 4px; cursor: pointer;">
+                        <span class="material-symbols-outlined">refresh</span>
+                        Refresh
+                    </button>
+                </div>
+
+                <div style="border-top: 1px solid #ecf0f1; padding-top: 1rem;">
+                    <h4 style="margin-bottom: 0.75rem; color: #2C3E50;">Recent Backups</h4>
+                    <div id="backup-list" style="max-height: 300px; overflow-y: auto;">
+                        <div style="color: #7f8c8d;">Loading...</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #ecf0f1;">
+                    <h4 style="margin-bottom: 0.75rem; color: #2C3E50;">Backup Configuration</h4>
+                    <ul style="list-style: none; padding: 0; color: #2C3E50; font-size: 0.875rem;">
+                        <li style="padding: 0.25rem 0;"><strong>Schedule:</strong> Automatic hourly backups while application is running</li>
+                        <li style="padding: 0.25rem 0;"><strong>Retention:</strong> 10 most recent backups</li>
+                        <li style="padding: 0.25rem 0;"><strong>Format:</strong> Timestamped SQLite database files</li>
+                        <li style="padding: 0.25rem 0;"><strong>Custom Location:</strong> Set <code>BACKUP_PATH</code> in .env file</li>
+                    </ul>
+                </div>
             </div>
         </div>
 
