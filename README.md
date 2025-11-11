@@ -192,6 +192,93 @@ Backups are stored in `%USERPROFILE%\OneDrive\Documents\vsol-analyst-backups\` b
 2. Copy the backup file to `prisma/dev.db`
 3. Restart the server
 
+## MCP Server Integration
+
+Sunny includes a Model Context Protocol (MCP) server that enables programmatic access to project data through Cursor and other MCP-compatible tools.
+
+### Setup MCP Server
+
+1. **Start the MCP server**
+   ```bash
+   npm run mcp
+   ```
+
+2. **Configure in Cursor**
+   
+   Add to Cursor settings (Settings > Features > Model Context Protocol):
+   
+   ```json
+   {
+     "mcpServers": {
+       "sunny": {
+         "command": "npm",
+         "args": ["run", "mcp"],
+         "cwd": "/path/to/vsol-analyst",
+         "env": {
+           "DATABASE_URL": "file:./prisma/dev.db"
+         }
+       }
+     }
+   }
+   ```
+
+### Available MCP Tools
+
+The MCP server provides the following tools for interacting with Sunny:
+
+**Read Operations:**
+- `list_projects` - List all projects with metadata
+- `get_user_stories` - Get user stories grouped by epic for a project
+- `get_requirements` - Get requirements document in markdown format
+- `get_diagrams` - Get workflow and flowchart diagrams (Mermaid format)
+- `get_seed_data` - Get seed data (JSON, SQL, or CSV format)
+
+**Update Operations:**
+- `update_user_story` - Update story fields (status, priority, effort, etc.)
+- `update_user_story_status` - Quick status change convenience tool
+
+### Available MCP Resources
+
+Access project data through resource URIs:
+
+- `sunny://project/{projectId}/requirements` - Requirements markdown
+- `sunny://project/{projectId}/workflow-diagram` - Workflow Mermaid diagram
+- `sunny://project/{projectId}/flowchart` - Detailed flowchart diagram
+- `sunny://project/{projectId}/seed-data` - Seed data JSON
+- `sunny://project/{projectId}/user-stories` - User stories markdown
+
+### Status, Priority, and Effort Values
+
+**Status:**
+- OPEN
+- IN_PROGRESS
+- READY_FOR_REVIEW
+- IN_REVIEW
+- DONE
+- REMOVED
+
+**Priority:**
+- MUST_HAVE
+- SHOULD_HAVE
+- NICE_TO_HAVE
+
+**Effort:**
+- SMALL
+- MEDIUM
+- LARGE
+
+### Example Usage in Cursor
+
+Once configured, you can use natural language in Cursor to interact with Sunny:
+
+- "Show me all projects in Sunny"
+- "Get user stories for project xyz123"
+- "Update story abc456 status to IN_PROGRESS"
+- "Show me the requirements document for project xyz123"
+- "Get the workflow diagram for this project"
+
+The MCP server runs independently from the main web application and provides read and update access to project data without requiring web UI interaction.
+
 ## Architecture
 
 ### Technology Stack
@@ -214,6 +301,8 @@ vsol-analyst/
 │   ├── llm/               # LLM provider abstraction
 │   ├── analyst/           # Core analyst logic
 │   ├── backup/            # Database backup utilities
+│   ├── mcp/               # MCP server for Cursor integration
+│   ├── utils/             # Shared utilities
 │   └── server.ts          # Express server
 ├── prisma/
 │   ├── schema.prisma      # Database schema

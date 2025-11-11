@@ -1,0 +1,65 @@
+# Sunny MCP Server Configuration
+
+## MCP Server Setup
+
+The Sunny MCP server provides programmatic access to:
+- User stories and epics
+- Requirements documents
+- Workflow and flowchart diagrams
+- Seed data
+
+### To configure in Cursor:
+
+Add this to your Cursor MCP settings (Settings > Features > Model Context Protocol):
+
+```json
+{
+  "mcpServers": {
+    "sunny": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "C:\\git\\vsol-analyst",
+      "env": {
+        "DATABASE_URL": "file:./prisma/dev.db"
+      }
+    }
+  }
+}
+```
+
+### Available Tools:
+
+1. **list_projects** - List all projects with metadata
+2. **get_user_stories** - Get user stories grouped by epic
+3. **get_requirements** - Get requirements document
+4. **get_diagrams** - Get Mermaid diagrams
+5. **get_seed_data** - Get seed data
+6. **update_user_story** - Update any user story field
+7. **update_user_story_status** - Quick status update
+
+### Available Resources:
+
+- `sunny://project/{projectId}/requirements`
+- `sunny://project/{projectId}/workflow-diagram`
+- `sunny://project/{projectId}/flowchart`
+- `sunny://project/{projectId}/seed-data`
+- `sunny://project/{projectId}/user-stories`
+
+### Status Values:
+- OPEN
+- IN_PROGRESS
+- READY_FOR_REVIEW
+- IN_REVIEW
+- DONE
+- REMOVED
+
+### Priority Values:
+- MUST_HAVE
+- SHOULD_HAVE
+- NICE_TO_HAVE
+
+### Effort Values:
+- SMALL
+- MEDIUM
+- LARGE
+
