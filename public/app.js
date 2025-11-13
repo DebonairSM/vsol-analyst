@@ -32,6 +32,7 @@ const userHeader = document.getElementById('user-header');
 const userName = document.getElementById('user-name');
 const adminBadge = document.getElementById('admin-badge');
 const adminViewBtn = document.getElementById('admin-view-btn');
+const settingsBtn = document.getElementById('settings-btn');
 const projectsList = document.getElementById('projects-list');
 const projectTitle = document.getElementById('project-title');
 const requirementsProjectTitle = document.getElementById('requirements-project-title');
@@ -70,6 +71,48 @@ function configureAvatarElement(avatarEl, size = 36) {
     avatarEl.style.objectFit = 'contain';
 }
 
+// Toast Notification System
+function showToast(message, type = 'info', duration = 5000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    // Icon based on type
+    const icons = {
+        success: 'check_circle',
+        error: 'error',
+        warning: 'warning',
+        info: 'info'
+    };
+
+    toast.innerHTML = `
+        <div class="toast-icon">
+            <span class="material-symbols-outlined">${icons[type] || icons.info}</span>
+        </div>
+        <div class="toast-content">
+            <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
+        </button>
+    `;
+
+    container.appendChild(toast);
+
+    // Auto remove after duration
+    if (duration > 0) {
+        setTimeout(() => {
+            toast.classList.add('hiding');
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+
+    return toast;
+}
+
 // Initialize app
 async function init() {
     // Check voice support on page load
@@ -93,7 +136,7 @@ async function init() {
                 }
             } else if (hash === '#/admin' && currentUser.isAdmin) {
                 showAdminDashboard();
-            } else if (hash === '#/settings') {
+            } else if (hash === '#/settings' && currentUser.isAdmin) {
                 showSettings();
             } else {
                 showProjects();
@@ -165,9 +208,11 @@ function showProjects() {
     if (currentUser.isAdmin) {
         adminBadge.style.display = 'inline';
         adminViewBtn.style.display = 'inline-block';
+        settingsBtn.style.display = 'inline-block';
     } else {
         adminBadge.style.display = 'none';
         adminViewBtn.style.display = 'none';
+        settingsBtn.style.display = 'none';
     }
     
     // Update URL
@@ -234,7 +279,7 @@ async function showRequirementsPage() {
         
         // Check if requirements are empty (not yet generated)
         if (data.isEmpty) {
-            alert('No requirements found for this project. Please chat with the analyst to generate requirements, then click "Extract Requirements".');
+            showToast('No requirements found for this project. Please chat with the analyst to generate requirements, then click "Extract Requirements".', 'info', 6000);
             returnToChat();
             return;
         }
@@ -278,7 +323,7 @@ async function showRequirementsPage() {
         document.getElementById('requirements-loading').style.display = 'none';
     } catch (error) {
         console.error('Error loading requirements:', error);
-        alert('Failed to load requirements');
+        showToast('Failed to load requirements', 'error');
         returnToChat();
     }
 }
@@ -335,7 +380,7 @@ async function logout() {
         showLogin();
     } catch (error) {
         console.error('Error logging out:', error);
-        alert('Failed to logout');
+        showToast('Failed to logout', 'error');
     }
 }
 
@@ -410,7 +455,7 @@ function hideNewProjectModal() {
 async function createProject() {
     const name = newProjectNameInput.value.trim();
     if (!name) {
-        alert('Please enter a project name');
+        showToast('Please enter a project name', 'warning');
         return;
     }
     
@@ -428,7 +473,7 @@ async function createProject() {
         await showChat(data.project);
     } catch (error) {
         console.error('Error creating project:', error);
-        alert('Failed to create project');
+        showToast('Failed to create project', 'error');
     }
 }
 
@@ -480,18 +525,18 @@ async function loadChatHistory(projectId) {
             // If no messages were shown, show welcome message
             if (!hasMessages) {
                 const firstName = currentUser.name.split(' ')[0];
-                addMessage('assistant', `Hello, ${firstName}! I'm Sunny, your friendly systems analyst for "${project.name}". Tell me about your business, and I'll help you identify your requirements.`);
+                addMessage('assistant', `Hello, ${firstName}! I'm Sunny, your friendly agent. I'll be working in the System Analyst role for "${project.name}", where I'll help you identify your requirements, document your business processes, and create comprehensive specifications. Do you have any questions about what a Systems Analyst agent does, or shall we get started?`);
             }
         } else {
             // No chat history, show welcome message
             const firstName = currentUser.name.split(' ')[0];
-            addMessage('assistant', `Hello, ${firstName}! I'm Sunny, your friendly systems analyst for "${project.name}". Tell me about your business, and I'll help you identify your requirements.`);
+            addMessage('assistant', `Hello, ${firstName}! I'm Sunny, your friendly agent. I'll be working in the System Analyst role for "${project.name}", where I'll help you identify your requirements, document your business processes, and create comprehensive specifications. Do you have any questions about what a Systems Analyst agent does, or shall we get started?`);
         }
     } catch (error) {
         console.error('Error loading chat history:', error);
         // Show welcome message as fallback
         const firstName = currentUser.name.split(' ')[0];
-        addMessage('assistant', `Hello, ${firstName}! I'm Sunny, your friendly systems analyst for "${currentProject.name}". Tell me about your business, and I'll help you identify your requirements.`);
+        addMessage('assistant', `Hello, ${firstName}! I'm Sunny, your friendly agent. I'll be working in the System Analyst role for "${currentProject.name}", where I'll help you identify your requirements, document your business processes, and create comprehensive specifications. Do you have any questions about what a Systems Analyst agent does, or shall we get started?`);
     }
 }
 
@@ -716,7 +761,7 @@ async function sendMessage() {
         
         if (!response.ok) {
             if (response.status === 401) {
-                alert('Session expired. Please login again.');
+                showToast('Session expired. Please login again.', 'warning');
                 showLogin();
                 return;
             }
@@ -900,7 +945,7 @@ async function performExtraction() {
             if (response.status === 401) {
                 clearLoadingIntervals();
                 hideOutputModal();
-                alert('Session expired. Please login again.');
+                showToast('Session expired. Please login again.', 'warning');
                 showLogin();
                 return;
             }
@@ -1164,7 +1209,7 @@ async function refreshRequirementsOnPage() {
         clearLoadingIntervals();
         document.getElementById('requirements-loading').style.display = 'none';
         document.getElementById('requirements-content').style.display = 'block';
-        alert('Failed to refresh requirements. Please try again.');
+        showToast('Failed to refresh requirements. Please try again.', 'error');
         console.error('Error:', error);
     }
 }
@@ -1182,7 +1227,7 @@ function copyMarkdown(event) {
         }, 2000);
     }).catch(err => {
         console.error('Failed to copy:', err);
-        alert('Failed to copy to clipboard');
+        showToast('Failed to copy to clipboard', 'error');
     });
 }
 
@@ -1199,7 +1244,7 @@ function copyMermaid(event) {
         }, 2000);
     }).catch(err => {
         console.error('Failed to copy:', err);
-        alert('Failed to copy to clipboard');
+        showToast('Failed to copy to clipboard', 'error');
     });
 }
 
@@ -1239,7 +1284,7 @@ function copyRequirementsMarkdown(event) {
         }, 2000);
     }).catch(err => {
         console.error('Failed to copy:', err);
-        alert('Failed to copy to clipboard');
+        showToast('Failed to copy to clipboard', 'error');
     });
 }
 
@@ -1256,7 +1301,7 @@ function copyRequirementsMermaid(event) {
         }, 2000);
     }).catch(err => {
         console.error('Failed to copy:', err);
-        alert('Failed to copy to clipboard');
+        showToast('Failed to copy to clipboard', 'error');
     });
 }
 
@@ -1273,7 +1318,7 @@ function copyRequirementsFlowchart(event) {
         }, 2000);
     }).catch(err => {
         console.error('Failed to copy:', err);
-        alert('Failed to copy to clipboard');
+        showToast('Failed to copy to clipboard', 'error');
     });
 }
 
@@ -1333,7 +1378,7 @@ async function generateUserStories() {
     
     if (!generateBtn || !storiesLoading || !storiesOutput || !userStoriesTextarea) {
         console.error('❌ Missing required elements for user story generation');
-        alert('Error: Required UI elements not found. Please refresh the page and try again.');
+        showToast('Error: Required UI elements not found. Please refresh the page and try again.', 'error', 7000);
         return;
     }
     
@@ -1496,7 +1541,7 @@ async function generateUserStories() {
     } catch (error) {
         console.error('Error generating user stories:', error);
         clearLoadingIntervals();
-        alert('Failed to generate user stories. Please try again.');
+        showToast('Failed to generate user stories. Please try again.', 'error');
         
         // Show button again on error
         generateBtn.style.display = 'inline-flex';
@@ -1622,7 +1667,7 @@ async function viewUserStoriesBoard() {
         
     } catch (error) {
         console.error('Error loading user stories:', error);
-        alert('Failed to load user stories');
+        showToast('Failed to load user stories', 'error');
     }
 }
 
@@ -1689,7 +1734,7 @@ async function editStory(storyId) {
         }
         
         if (!story) {
-            alert('Story not found');
+            showToast('Story not found', 'error');
             return;
         }
         
@@ -1775,7 +1820,7 @@ async function editStory(storyId) {
         
     } catch (error) {
         console.error('Error loading story for edit:', error);
-        alert('Failed to load story');
+        showToast('Failed to load story', 'error');
     }
 }
 
@@ -1839,7 +1884,7 @@ async function saveStory(storyId) {
         
     } catch (error) {
         console.error('Error saving story:', error);
-        alert('Failed to save story');
+        showToast('Failed to save story', 'error');
     }
 }
 
@@ -1883,7 +1928,7 @@ async function confirmBranchProject() {
     const newName = nameInput.value.trim();
     
     if (!newName) {
-        alert('Please enter a name for the new project');
+        showToast('Please enter a name for the new project', 'warning');
         return;
     }
     
@@ -1905,14 +1950,14 @@ async function confirmBranchProject() {
         hideBranchProjectModal();
         
         // Show success message
-        alert(`Project branched successfully! ${data.project.epics.reduce((sum, e) => sum + e.stories.length, 0)} user stories copied.`);
+        showToast(`Project branched successfully! ${data.project.epics.reduce((sum, e) => sum + e.stories.length, 0)} user stories copied.`, 'success', 6000);
         
         // Reload projects list
         await loadProjects();
         
     } catch (error) {
         console.error('Error branching project:', error);
-        alert('Failed to branch project');
+        showToast('Failed to branch project', 'error');
     } finally {
         confirmBtn.disabled = false;
         confirmBtn.textContent = 'Branch Project';
@@ -2081,7 +2126,7 @@ async function generateFlowchart() {
     } catch (error) {
         console.error('Error generating flowchart:', error);
         clearLoadingIntervals();
-        alert('Failed to generate flowchart. Please try again.');
+        showToast('Failed to generate flowchart. Please try again.', 'error');
         
         // Show button again on error
         generateBtn.style.display = 'inline-flex';
@@ -2300,7 +2345,7 @@ async function viewProjectChat(projectId) {
         }
     } catch (error) {
         console.error('Error viewing project chat:', error);
-        alert('Failed to load project chat');
+        showToast('Failed to load project chat', 'error');
     }
 }
 
@@ -2313,7 +2358,7 @@ async function polishText() {
     if (!text || isProcessing) return;
     
     if (text.length < 5) {
-        alert('Please enter some text to polish.');
+        showToast('Please enter some text to polish.', 'warning');
         return;
     }
     
@@ -2341,7 +2386,7 @@ async function polishText() {
         if (!response.ok) {
             if (response.status === 401) {
                 hidePolishModal();
-                alert('Session expired. Please login again.');
+                showToast('Session expired. Please login again.', 'warning');
                 showLogin();
                 return;
             }
@@ -2361,7 +2406,7 @@ async function polishText() {
         showPolishResults();
     } catch (error) {
         hidePolishModal();
-        alert('Failed to polish text. Please try again.');
+        showToast('Failed to polish text. Please try again.', 'error');
         console.error('Error:', error);
     }
     
@@ -2442,7 +2487,7 @@ async function handleExcelUpload(event) {
     ];
     
     if (!allowedTypes.includes(file.type)) {
-        alert('Please upload an Excel file (.xls or .xlsx)');
+        showToast('Please upload an Excel file (.xls or .xlsx)', 'warning');
         excelFileInput.value = '';
         return;
     }
@@ -2450,7 +2495,7 @@ async function handleExcelUpload(event) {
     // Validate file size (10MB max)
     const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-        alert('File size must be less than 10MB');
+        showToast('File size must be less than 10MB', 'warning');
         excelFileInput.value = '';
         return;
     }
@@ -2485,7 +2530,7 @@ async function handleExcelUpload(event) {
         if (!response.ok) {
             if (response.status === 401) {
                 removeLoading();
-                alert('Session expired. Please login again.');
+                showToast('Session expired. Please login again.', 'warning');
                 showLogin();
                 return;
             }
@@ -2528,7 +2573,7 @@ async function handleImageUpload(event) {
     // Validate file type
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-        alert('Please select a valid image file (PNG, JPG, GIF, WebP)');
+        showToast('Please select a valid image file (PNG, JPG, GIF, WebP)', 'warning');
         imageFileInput.value = '';
         return;
     }
@@ -2536,7 +2581,7 @@ async function handleImageUpload(event) {
     // Validate file size (10MB max)
     const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-        alert('File size must be less than 10MB');
+        showToast('File size must be less than 10MB', 'warning');
         imageFileInput.value = '';
         return;
     }
@@ -2655,11 +2700,11 @@ function initSpeechRecognition() {
             
             // Handle specific error cases
             if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                alert('Microphone access denied. Please enable microphone permissions in your browser settings.');
+                showToast('Microphone access denied. Please enable microphone permissions in your browser settings.', 'error', 7000);
             } else if (event.error === 'no-speech') {
                 console.log('No speech detected');
             } else if (event.error === 'network') {
-                alert('Network error occurred. Please check your connection.');
+                showToast('Network error occurred. Please check your connection.', 'error');
             }
             
             stopRecording();
@@ -2688,7 +2733,7 @@ function toggleRecording() {
     }
     
     if (!recognition) {
-        alert('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari for voice input.');
+        showToast('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari for voice input.', 'warning', 7000);
         voiceBtn.classList.add('not-supported');
         voiceBtn.disabled = true;
         return;
@@ -2715,7 +2760,7 @@ function startRecording() {
             voiceBtn.classList.add('recording');
             voiceBtn.innerHTML = '<span class="material-symbols-outlined">stop_circle</span>Stop';
         } else {
-            alert('Failed to start voice recognition. Please try again.');
+            showToast('Failed to start voice recognition. Please try again.', 'error');
         }
     }
 }
@@ -2830,7 +2875,7 @@ window.addEventListener('popstate', () => {
         }
     } else if (hash === '#/admin' && currentUser.isAdmin) {
         showAdminDashboard();
-    } else if (hash === '#/settings') {
+    } else if (hash === '#/settings' && currentUser.isAdmin) {
         showSettings();
     } else {
         showProjects();
@@ -2898,7 +2943,7 @@ async function showSeedDataModal() {
         }
     } catch (error) {
         console.error('Error loading spreadsheet list:', error);
-        alert('Failed to load spreadsheets. Please try again.');
+        showToast('Failed to load spreadsheets. Please try again.', 'error');
         hideSeedDataModal();
     }
 }
@@ -2957,7 +3002,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 detailsDiv.style.display = 'block';
             } catch (error) {
                 console.error('Error loading spreadsheet data:', error);
-                alert('Failed to load spreadsheet data. Please try again.');
+                showToast('Failed to load spreadsheet data. Please try again.', 'error');
             }
         });
     }
@@ -2994,7 +3039,7 @@ async function exportAsJSON() {
         URL.revokeObjectURL(url);
     } catch (error) {
         console.error('Error exporting JSON:', error);
-        alert('Failed to generate seed data. Please try again.');
+        showToast('Failed to generate seed data. Please try again.', 'error');
     }
 }
 
@@ -3029,7 +3074,7 @@ async function exportAsSQL() {
         URL.revokeObjectURL(url);
     } catch (error) {
         console.error('Error exporting SQL:', error);
-        alert('Failed to generate seed data. Please try again.');
+        showToast('Failed to generate seed data. Please try again.', 'error');
     }
 }
 
@@ -3072,7 +3117,7 @@ async function exportAsCSV() {
         });
     } catch (error) {
         console.error('Error exporting CSV:', error);
-        alert('Failed to generate seed data. Please try again.');
+        showToast('Failed to generate seed data. Please try again.', 'error');
     }
 }
 
@@ -3088,6 +3133,12 @@ document.getElementById('seed-data-modal')?.addEventListener('click', (e) => {
 // ===========================
 
 async function showSettings() {
+    // Only allow admin users to access settings
+    if (!currentUser || !currentUser.isAdmin) {
+        showProjects();
+        return;
+    }
+    
     const settingsPage = document.getElementById('settings-page');
     const projectsPage = document.getElementById('projects-page');
     const adminPage = document.getElementById('admin-page');
@@ -3199,7 +3250,7 @@ async function triggerBackupNow() {
             btn.innerHTML = originalText;
             btn.disabled = false;
         }, 2000);
-        alert('Failed to create backup: ' + error.message);
+        showToast('Failed to create backup: ' + error.message, 'error');
     }
 }
 
