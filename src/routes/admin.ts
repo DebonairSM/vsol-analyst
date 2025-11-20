@@ -3,6 +3,7 @@ import { requireAdmin } from "../auth/middleware";
 import { prisma } from "../utils/prisma";
 import { NotFoundError, logError } from "../utils/errors";
 import { asyncHandler } from "../utils/async-handler";
+import { validateUUID } from "../utils/validation";
 import { createAttachmentResolver } from "../utils/attachment-helpers";
 import { configureSSEHeaders, sendSSEProgress, sendSSEData, sendSSEError } from "../utils/sse-helpers";
 
@@ -79,6 +80,7 @@ router.get("/projects", requireAdmin, asyncHandler(async (req, res) => {
 // View specific project's chat history
 router.get("/projects/:id/chat", requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params;
+  validateUUID(id);
 
   const project = await prisma.project.findUnique({
     where: { id },
@@ -116,6 +118,7 @@ router.get("/projects/:id/chat", requireAdmin, asyncHandler(async (req, res) => 
 router.post("/projects/:id/extract", requireAdmin, async (req, res) => {
   try {
     const { id: projectId } = req.params;
+    validateUUID(projectId);
 
     // Get project with sessions (no ownership check for admin)
     const project = await prisma.project.findUnique({

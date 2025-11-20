@@ -9,9 +9,11 @@ import { NotFoundError, ValidationError, logError } from "../utils/errors";
 import { asyncHandler } from "../utils/async-handler";
 import { createAttachmentResolver } from "../utils/attachment-helpers";
 import { configureSSEHeaders, sendSSEProgress, sendSSEData, sendSSEError, delay } from "../utils/sse-helpers";
-import { validateTextInput } from "../utils/validation";
+import { validateTextInput, validateUUID } from "../utils/validation";
 import * as constants from "../utils/constants";
 import { verifyProjectOwnership, getOrCreateChatSession, updateChatSessionHistory } from "../utils/project-helpers";
+import { escapeSQLIdentifier, generateSafeSQLInsert } from "../utils/sql-escape";
+import { validateSpreadsheetFileType, validateImageFileType } from "../utils/file-type-validation";
 
 import { OpenAILLMProvider } from "../llm/OpenAILLMProvider";
 import { RequirementsExtractor } from "../analyst/RequirementsExtractor";
@@ -316,6 +318,7 @@ router.post("/extract-stream", requireAuth, async (req, res) => {
 router.get("/requirements/:projectId", requireAuth, async (req, res) => {
   try {
     const { projectId } = req.params;
+    validateUUID(projectId);
     const user = req.user as any;
 
     // Verify project ownership
@@ -822,6 +825,17 @@ router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), asyn
       return res.status(404).json({ error: "Project not found" });
     }
 
+    // Validate file type by checking magic bytes (prevents MIME type spoofing)
+    try {
+      await validateSpreadsheetFileType(req.file.path);
+    } catch (validationError) {
+      // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ 
+        error: validationError instanceof Error ? validationError.message : "Invalid file type" 
+      });
+    }
+
     // Read and parse the Excel file
     const workbook = XLSX.readFile(req.file.path);
     const result: any = {
@@ -971,6 +985,7 @@ router.get("/get-spreadsheet-data/:attachmentId", requireAuth, async (req, res) 
   try {
     const user = req.user as any;
     const { attachmentId } = req.params;
+    validateUUID(attachmentId);
 
     // Get attachment with session info to verify ownership
     const attachment = await prisma.attachment.findUnique({
@@ -1082,28 +1097,22 @@ router.post("/generate-seed-data", requireAuth, async (req, res) => {
           
           if (sheetData.length === 0) return;
           
-          const tableName = sheetName.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+          // Use safe SQL escaping for table name
+          const tableName = escapeSQLIdentifier(sheetName.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase());
           sql += `-- Table: ${tableName}\n`;
           
           const headers = sheetData[0];
           const dataRows = sheetData.slice(1);
           
           if (headers && headers.length > 0 && dataRows.length > 0) {
+            // Use safe SQL escaping for column names
             const columns = headers.map((h: any, idx: number) => 
-              h ? String(h).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase() : `column_${idx + 1}`
+              h ? escapeSQLIdentifier(String(h).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()) : escapeSQLIdentifier(`column_${idx + 1}`)
             );
             
-            dataRows.forEach((row: any[]) => {
-              const values = row.map(val => {
-                if (val === null || val === undefined || val === '') return 'NULL';
-                if (typeof val === 'number') return val;
-                return `'${String(val).replace(/'/g, "''")}'`;
-              });
-              
-              sql += `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${values.join(', ')});\n`;
-            });
-            
-            sql += '\n';
+            // Generate safe SQL INSERT statements
+            const safeInsert = generateSafeSQLInsert(tableName, columns, dataRows);
+            sql += safeInsert + '\n';
           }
         });
         
@@ -1172,6 +1181,7 @@ router.post("/generate-seed-data", requireAuth, async (req, res) => {
 router.get("/seed-data/:projectId", requireAuth, async (req, res) => {
   try {
     const { projectId } = req.params;
+    validateUUID(projectId);
     const user = req.user as any;
 
     // Verify project ownership
@@ -1233,6 +1243,17 @@ router.post("/upload-image", requireAuth, uploadImage.single("file"), async (req
       // Clean up uploaded file on error
       fs.unlinkSync(req.file.path);
       return res.status(404).json({ error: "Project not found" });
+    }
+
+    // Validate file type by checking magic bytes (prevents MIME type spoofing)
+    try {
+      await validateImageFileType(req.file.path);
+    } catch (validationError) {
+      // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ 
+        error: validationError instanceof Error ? validationError.message : "Invalid file type" 
+      });
     }
 
     // Get or create chat session for this project

@@ -3,7 +3,7 @@ import { StoryStatus, StoryPriority, StoryEffort } from "@prisma/client";
 import { requireAuth } from "../auth/middleware";
 import { prisma } from "../utils/prisma";
 import { getAuthenticatedUser } from "../utils/prisma-helpers";
-import { validateProjectName } from "../utils/validation";
+import { validateProjectName, validateUUID } from "../utils/validation";
 import { NotFoundError, ForbiddenError, ValidationError, logError } from "../utils/errors";
 import { asyncHandler } from "../utils/async-handler";
 
@@ -55,6 +55,7 @@ router.post("/", requireAuth, asyncHandler(async (req, res) => {
 router.get("/:id", requireAuth, asyncHandler(async (req, res) => {
   const user = getAuthenticatedUser(req.user);
   const { id } = req.params;
+  validateUUID(id);
 
   const project = await prisma.project.findFirst({
     where: {
@@ -85,6 +86,7 @@ router.get("/:id", requireAuth, asyncHandler(async (req, res) => {
 router.patch("/:id", requireAuth, asyncHandler(async (req, res) => {
   const user = getAuthenticatedUser(req.user);
   const { id } = req.params;
+  validateUUID(id);
   const projectName = validateProjectName(req.body.name);
 
   // Verify ownership
@@ -113,6 +115,7 @@ router.patch("/:id", requireAuth, asyncHandler(async (req, res) => {
 router.get("/:id/stories", requireAuth, asyncHandler(async (req, res) => {
   const user = getAuthenticatedUser(req.user);
   const { id } = req.params;
+  validateUUID(id);
 
   // Verify project ownership
   const project = await prisma.project.findFirst({
@@ -170,6 +173,7 @@ router.get("/:id/stories", requireAuth, asyncHandler(async (req, res) => {
 router.post("/:id/stories", requireAuth, asyncHandler(async (req, res) => {
   const user = getAuthenticatedUser(req.user);
   const { id } = req.params;
+  validateUUID(id);
   const { stories } = req.body;
 
   if (!stories || !Array.isArray(stories)) {
@@ -240,6 +244,8 @@ router.post("/:id/stories", requireAuth, asyncHandler(async (req, res) => {
 router.patch("/:id/stories/:storyId", requireAuth, asyncHandler(async (req, res) => {
   const user = getAuthenticatedUser(req.user);
   const { id, storyId } = req.params;
+  validateUUID(id);
+  validateUUID(storyId);
   const updates = req.body;
 
   // Verify project ownership
@@ -328,6 +334,8 @@ router.patch("/:id/stories/:storyId", requireAuth, asyncHandler(async (req, res)
 router.get("/:id/stories/:storyId/transitions", requireAuth, asyncHandler(async (req, res) => {
   const user = getAuthenticatedUser(req.user);
   const { id, storyId } = req.params;
+  validateUUID(id);
+  validateUUID(storyId);
 
   // Verify project ownership
   const project = await prisma.project.findFirst({
@@ -413,6 +421,8 @@ router.get("/:id/stories/:storyId/transitions", requireAuth, asyncHandler(async 
 router.delete("/:id/stories/:storyId", requireAuth, asyncHandler(async (req, res) => {
   const user = getAuthenticatedUser(req.user);
   const { id, storyId } = req.params;
+  validateUUID(id);
+  validateUUID(storyId);
 
   // Verify project ownership
   const project = await prisma.project.findFirst({
@@ -452,6 +462,7 @@ router.delete("/:id/stories/:storyId", requireAuth, asyncHandler(async (req, res
 router.post("/:id/branch", requireAuth, asyncHandler(async (req, res) => {
   const user = getAuthenticatedUser(req.user);
   const { id } = req.params;
+  validateUUID(id);
   const projectName = validateProjectName(req.body.name);
 
   // Verify source project ownership

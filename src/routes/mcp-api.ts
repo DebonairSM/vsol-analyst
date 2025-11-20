@@ -1,15 +1,17 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { prisma } from "../utils/prisma";
 import { asyncHandler } from "../utils/async-handler";
-import { NotFoundError, ValidationError } from "../utils/errors";
+import { NotFoundError, ValidationError, UnauthorizedError } from "../utils/errors";
 import { StoryStatus, StoryPriority, StoryEffort } from "@prisma/client";
+import { timingSafeEqual } from "../utils/security";
+import { validateUUID } from "../utils/validation";
 
 const router = Router();
 
 /**
- * Simple API key middleware for MCP server access
+ * Secure API key middleware for MCP server access with timing-safe comparison
  */
-function requireApiKey(req: any, res: any, next: any) {
+function requireApiKey(req: Request, res: Response, next: NextFunction) {
   const apiKey = req.headers["x-api-key"];
   const expectedApiKey = process.env.MCP_API_KEY;
 
@@ -17,8 +19,13 @@ function requireApiKey(req: any, res: any, next: any) {
     return res.status(500).json({ error: "MCP_API_KEY not configured" });
   }
 
-  if (apiKey !== expectedApiKey) {
-    return res.status(401).json({ error: "Invalid API key" });
+  if (!apiKey || typeof apiKey !== "string") {
+    throw new UnauthorizedError("API key required");
+  }
+
+  // Use timing-safe comparison to prevent timing attacks
+  if (!timingSafeEqual(apiKey, expectedApiKey)) {
+    throw new UnauthorizedError("Invalid API key");
   }
 
   next();
@@ -60,6 +67,7 @@ router.get("/projects", requireApiKey, asyncHandler(async (req, res) => {
 // Get user stories for a project (grouped by epic)
 router.get("/projects/:projectId/stories", requireApiKey, asyncHandler(async (req, res) => {
   const { projectId } = req.params;
+  validateUUID(projectId); // Validate UUID format
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -88,6 +96,7 @@ router.get("/projects/:projectId/stories", requireApiKey, asyncHandler(async (re
 // Get requirements document
 router.get("/projects/:projectId/requirements", requireApiKey, asyncHandler(async (req, res) => {
   const { projectId } = req.params;
+  validateUUID(projectId);
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -118,6 +127,7 @@ router.get("/projects/:projectId/requirements", requireApiKey, asyncHandler(asyn
 // Get workflow diagram (Mermaid)
 router.get("/projects/:projectId/workflow-diagram", requireApiKey, asyncHandler(async (req, res) => {
   const { projectId } = req.params;
+  validateUUID(projectId);
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -148,6 +158,7 @@ router.get("/projects/:projectId/workflow-diagram", requireApiKey, asyncHandler(
 // Get flowchart diagram (Mermaid)
 router.get("/projects/:projectId/flowchart", requireApiKey, asyncHandler(async (req, res) => {
   const { projectId } = req.params;
+  validateUUID(projectId);
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -176,6 +187,7 @@ router.get("/projects/:projectId/flowchart", requireApiKey, asyncHandler(async (
 // Get seed data
 router.get("/projects/:projectId/seed-data", requireApiKey, asyncHandler(async (req, res) => {
   const { projectId } = req.params;
+  validateUUID(projectId);
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -204,6 +216,8 @@ router.get("/projects/:projectId/seed-data", requireApiKey, asyncHandler(async (
 // Update a user story
 router.patch("/projects/:projectId/stories/:storyId", requireApiKey, asyncHandler(async (req, res) => {
   const { projectId, storyId } = req.params;
+  validateUUID(projectId);
+  validateUUID(storyId);
   const updates = req.body;
 
   // Verify story belongs to project
