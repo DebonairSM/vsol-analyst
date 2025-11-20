@@ -10,6 +10,124 @@ let tipsInterval = null; // Track tips rotation intervals
 let progressAnimationInterval = null; // Track progress bar animation
 let currentProgress = 0; // Current progress for smooth animation
 let targetProgress = 0; // Target progress from backend
+let csrfToken = null; // CSRF token for protecting state-changing requests
+
+// CSRF Token Management
+async function fetchCSRFToken() {
+    try {
+        const response = await fetch('/api/csrf-token', {
+            method: 'GET',
+            credentials: 'include'
+        });
+        if (response.ok) {
+            const data = await response.json();
+            csrfToken = data.csrfToken;
+            return csrfToken;
+        }
+    } catch (error) {
+        console.warn('Failed to fetch CSRF token:', error);
+    }
+    return null;
+}
+
+// Secure fetch wrapper that automatically includes CSRF token for state-changing requests
+async function secureFetch(url, options = {}) {
+    // Ensure we have a CSRF token
+    if (!csrfToken) {
+        await fetchCSRFToken();
+    }
+    
+    // Clone options to avoid mutating the original
+    const fetchOptions = { ...options };
+    
+    // Add credentials for cookie-based sessions
+    fetchOptions.credentials = 'include';
+    
+    // Determine if this is a state-changing request
+    const method = (fetchOptions.method || 'GET').toUpperCase();
+    const isStateChanging = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
+    
+    // Add CSRF token to state-changing requests
+    if (isStateChanging && csrfToken) {
+        // Set headers if not already present
+        if (!fetchOptions.headers) {
+            fetchOptions.headers = {};
+        }
+        
+        // If headers is a Headers object, we need to handle it differently
+        if (fetchOptions.headers instanceof Headers) {
+            fetchOptions.headers.set('x-csrf-token', csrfToken);
+        } else {
+            // For object headers, add CSRF token
+            fetchOptions.headers['x-csrf-token'] = csrfToken;
+            
+            // Also add to body if it's JSON
+            if (fetchOptions.body && typeof fetchOptions.body === 'string') {
+                try {
+                    const bodyObj = JSON.parse(fetchOptions.body);
+                    bodyObj._csrf = csrfToken;
+                    fetchOptions.body = JSON.stringify(bodyObj);
+                } catch (e) {
+                    // If body is not JSON, just use header
+                }
+            } else if (fetchOptions.body instanceof FormData) {
+                // For FormData, add CSRF token as form field
+                fetchOptions.body.append('_csrf', csrfToken);
+            } else if (!fetchOptions.body) {
+                // If no body, add as JSON field
+                fetchOptions.body = JSON.stringify({ _csrf: csrfToken });
+                if (!fetchOptions.headers['Content-Type']) {
+                    fetchOptions.headers['Content-Type'] = 'application/json';
+                }
+            }
+        }
+    }
+    
+    // Make the fetch request
+    let response = await fetch(url, fetchOptions);
+    
+    // If CSRF token expired (401), try to refresh and retry once
+    if (response.status === 401 && isStateChanging) {
+        const errorData = await response.json().catch(() => ({}));
+        if (errorData.error && errorData.error.includes('CSRF')) {
+            // Refresh CSRF token
+            await fetchCSRFToken();
+            if (csrfToken) {
+                // Retry with new token
+                const retryOptions = { ...options };
+                retryOptions.credentials = 'include';
+                
+                if (!retryOptions.headers) {
+                    retryOptions.headers = {};
+                }
+                
+                if (retryOptions.headers instanceof Headers) {
+                    retryOptions.headers.set('x-csrf-token', csrfToken);
+                } else {
+                    retryOptions.headers['x-csrf-token'] = csrfToken;
+                    
+                    // Update body with new token if it's JSON
+                    if (retryOptions.body && typeof retryOptions.body === 'string') {
+                        try {
+                            const bodyObj = JSON.parse(retryOptions.body);
+                            bodyObj._csrf = csrfToken;
+                            retryOptions.body = JSON.stringify(bodyObj);
+                        } catch (e) {
+                            // Ignore parsing errors
+                        }
+                    } else if (retryOptions.body instanceof FormData) {
+                        // For FormData, add CSRF token as form field
+                        retryOptions.body.append('_csrf', csrfToken);
+                    }
+                }
+                
+                response = await fetch(url, retryOptions);
+            }
+        }
+    }
+    
+    return response;
+}
 
 // Educational tips to rotate during loading
 const educationalTips = [
@@ -118,8 +236,13 @@ async function init() {
     // Check voice support on page load
     checkVoiceSupport();
     
+    // Fetch CSRF token on initialization
+    await fetchCSRFToken();
+    
     try {
-        const response = await fetch('/auth/me');
+        const response = await fetch('/auth/me', {
+            credentials: 'include'
+        });
         if (response.ok) {
             const data = await response.json();
             currentUser = data.user;
@@ -372,7 +495,10 @@ function loginWithGoogle() {
 
 async function logout() {
     try {
-        await fetch('/auth/logout');
+        await secureFetch('/auth/logout', {
+            method: 'GET',
+            credentials: 'include'
+        });
         currentUser = null;
         currentProject = null;
         // Clear URL hash to prevent routing issues
@@ -460,7 +586,7 @@ async function createProject() {
     }
     
     try {
-        const response = await fetch('/api/projects', {
+        const response = await secureFetch('/api/projects', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name })
@@ -750,7 +876,7 @@ async function sendMessage() {
     showLoading();
     
     try {
-        const response = await fetch('/analyst/chat', {
+        const response = await secureFetch('/analyst/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -935,7 +1061,7 @@ async function performExtraction() {
             ? `/api/admin/projects/${currentProject.id}/extract`
             : '/analyst/extract-stream';
         
-        const response = await fetch(endpoint, {
+        const response = await secureFetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: currentProject.isAdminView ? undefined : JSON.stringify({ projectId: currentProject.id })
@@ -1433,7 +1559,7 @@ async function generateUserStories() {
             });
         } else {
             // Fallback to legacy endpoint that re-extracts requirements
-            response = await fetch('/analyst/generate-stories', {
+            response = await secureFetch('/analyst/generate-stories', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId: currentProject.id })
@@ -1861,7 +1987,7 @@ async function saveStory(storyId) {
             .filter(ac => ac.description.trim() !== '');
         
         // Update story
-        const response = await fetch(`/api/projects/${currentProject.id}/stories/${storyId}`, {
+        const response = await secureFetch(`/api/projects/${currentProject.id}/stories/${storyId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1937,7 +2063,7 @@ async function confirmBranchProject() {
     confirmBtn.textContent = 'Branching...';
     
     try {
-        const response = await fetch(`/api/projects/${branchSourceProject.id}/branch`, {
+        const response = await secureFetch(`/api/projects/${branchSourceProject.id}/branch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: newName })
@@ -2032,7 +2158,7 @@ async function generateFlowchart() {
     startTipsRotation(prefix + 'flowchart-tip', flowchartTips);
     
     try {
-        const response = await fetch('/analyst/generate-flowchart-stream', {
+        const response = await secureFetch('/analyst/generate-flowchart-stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ requirements: cachedRequirements, projectId: currentProject.id })
@@ -2377,7 +2503,7 @@ async function polishText() {
     showPolishModal();
     
     try {
-        const response = await fetch('/analyst/polish', {
+        const response = await secureFetch('/analyst/polish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text })
@@ -2522,7 +2648,7 @@ async function handleExcelUpload(event) {
         formData.append('file', file);
         formData.append('projectId', currentProject.id);
         
-        const response = await fetch('/analyst/upload-excel', {
+        const response = await secureFetch('/analyst/upload-excel', {
             method: 'POST',
             body: formData
         });
@@ -2608,7 +2734,7 @@ async function handleImageUpload(event) {
         formData.append('file', file);
         formData.append('projectId', currentProject.id);
         
-        const response = await fetch('/analyst/upload-image', {
+        const response = await secureFetch('/analyst/upload-image', {
             method: 'POST',
             body: formData
         });
@@ -3013,7 +3139,7 @@ async function exportAsJSON() {
     
     try {
         // Save to database first
-        const response = await fetch('/analyst/generate-seed-data', {
+        const response = await secureFetch('/analyst/generate-seed-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -3048,7 +3174,7 @@ async function exportAsSQL() {
     
     try {
         // Save to database first
-        const response = await fetch('/analyst/generate-seed-data', {
+        const response = await secureFetch('/analyst/generate-seed-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -3083,7 +3209,7 @@ async function exportAsCSV() {
     
     try {
         // Save to database first
-        const response = await fetch('/analyst/generate-seed-data', {
+        const response = await secureFetch('/analyst/generate-seed-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -3220,7 +3346,7 @@ async function triggerBackupNow() {
         btn.disabled = true;
         btn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Creating backup...';
         
-        const response = await fetch('/api/system/backup-now', {
+        const response = await secureFetch('/api/system/backup-now', {
             method: 'POST'
         });
         

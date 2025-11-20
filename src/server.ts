@@ -149,8 +149,14 @@ app.use((req, res, next) => {
 });
 
 // Root route serves the chat UI
-app.get("/", (req, res) => {
+app.get("/", generateCSRFToken, (req, res) => {
+  // CSRF token is already set in res.locals.csrfToken by middleware
   res.sendFile(path.join(__dirname, "../public/index.html"));
+});
+
+// API endpoint to get CSRF token (for frontend to fetch on load)
+app.get("/api/csrf-token", generateCSRFToken, (req, res) => {
+  res.json({ csrfToken: res.locals.csrfToken || null });
 });
 
 // Mount route modules with CSRF protection (except for MCP API which uses API keys)
