@@ -37,10 +37,9 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-// Trust proxy if in production (for secure cookies behind reverse proxy)
-if (isProd) {
-  app.set("trust proxy", 1);
-}
+// Trust proxy - required for express-rate-limit to correctly identify client IPs
+// when X-Forwarded-For header is present (common behind proxies, load balancers, or some dev tools)
+app.set("trust proxy", 1);
 
 // Security headers via helmet
 app.use(helmet({
@@ -48,10 +47,11 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"], // Note: Consider removing unsafe-inline in future
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrcAttr: ["'unsafe-inline'"], // Allow inline event handlers (onclick, etc.)
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'"],
-      fontSrc: ["'self'", "data:"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
     },
   },
   hsts: {

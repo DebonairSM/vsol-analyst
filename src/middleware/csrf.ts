@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import { CSRF } from "csrf";
+import csrf from "csrf";
 import { UnauthorizedError } from "../utils/errors";
 
-const csrfProtection = new CSRF();
+const csrfProtection = csrf();
 
 /**
  * Middleware to generate CSRF token for GET requests
