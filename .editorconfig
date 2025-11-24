@@ -27,4 +27,3 @@ trim_trailing_whitespace = false
 # Package files
 [{package.json,package-lock.json}]
 indent_size = 2
-
