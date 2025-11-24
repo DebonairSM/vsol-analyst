@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 *.tsbuildinfo
+*.tsbuildinfo.json
 
 # Database files
 prisma/**/*.db
@@ -42,10 +43,20 @@ coverage/
 .DS_Store
 Thumbs.db
 Desktop.ini
+ehthumbs.db
 
 # Optional npm cache
 .npm
 .eslintcache
+
+# Vite
+.vite/
+vite.config.*.timestamp-*
+
+# Backup files
+*.bak
+*.backup
+*.old
 
 # Temporary files
 *.tmp

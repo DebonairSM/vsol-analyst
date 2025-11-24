@@ -1,21 +1,32 @@
 import { Router } from "express";
 import * as fs from "fs";
 import * as path from "path";
-import { homedir } from "os";
 import { asyncHandler } from "../utils/async-handler";
-import { backupDatabase } from "../backup/database-backup";
+import { backupDatabase, getBackupDirectory } from "../backup/database-backup";
 
 const router = Router();
 
-function getBackupDirectory(): string {
-  const backupPath = process.env.BACKUP_PATH;
-  
-  if (backupPath) {
-    return backupPath;
+function parseTimestampFromFilename(filename: string): Date | null {
+  // Extract timestamp from filename: sunny-dev-2025-11-24_13-23-48-244Z.db or dev-2025-11-24_13-00-00-037Z.db
+  // Format: {prefix}-{year}-{month}-{day}_{hour}-{minute}-{second}-{milliseconds}Z.db
+  const match = filename.match(/(?:sunny-)?dev-(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})-(\d+)Z\.db$/);
+  if (match) {
+    const [, year, month, day, hour, minute, second, milliseconds] = match;
+    try {
+      return new Date(
+        parseInt(year),
+        parseInt(month) - 1, // Month is 0-indexed
+        parseInt(day),
+        parseInt(hour),
+        parseInt(minute),
+        parseInt(second),
+        parseInt(milliseconds)
+      );
+    } catch (e) {
+      return null;
+    }
   }
-  
-  const home = homedir();
-  return path.join(home, "OneDrive", "Documents", "vsol-analyst-backups");
+  return null;
 }
 
 function getBackupFiles(): Array<{ name: string; size: number; timestamp: Date }> {
@@ -27,14 +38,16 @@ function getBackupFiles(): Array<{ name: string; size: number; timestamp: Date }
 
   return fs
     .readdirSync(backupDir)
-    .filter((f) => f.startsWith("dev-") && f.endsWith(".db"))
+    .filter((f) => (f.startsWith("sunny-dev-") || f.startsWith("dev-")) && f.endsWith(".db"))
     .map((f) => {
       const filePath = path.join(backupDir, f);
       const stats = fs.statSync(filePath);
+      // Try to parse timestamp from filename, fallback to file mtime
+      const filenameTimestamp = parseTimestampFromFilename(f);
       return {
         name: f,
         size: stats.size,
-        timestamp: stats.mtime,
+        timestamp: filenameTimestamp || stats.mtime,
       };
     })
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());

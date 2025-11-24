@@ -3350,11 +3350,11 @@ async function triggerBackupNow() {
             method: 'POST'
         });
         
-        if (!response.ok) {
-            throw new Error('Backup failed');
-        }
-        
         const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.message || result.error || 'Backup failed');
+        }
         
         if (result.success) {
             btn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Backup created!';

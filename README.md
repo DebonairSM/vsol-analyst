@@ -195,10 +195,10 @@ npx prisma studio
 
 The system automatically backs up the database every hour while the application is running.
 
-- **Backup Location**: `%USERPROFILE%\OneDrive\Documents\vsol-analyst-backups\`
+- **Backup Location**: `%USERPROFILE%\OneDrive\Documents\backups\Sunny\`
 - **Frequency**: Hourly (at the top of each hour when app is running)
 - **Retention**: 10 most recent backups
-- **Format**: Timestamped SQLite files (e.g., `dev-2025-11-07_14-30-00.db`)
+- **Format**: Timestamped SQLite files (e.g., `sunny-dev-2025-11-24_13-23-48-244Z.db`)
 
 **Manual backup:**
 ```bash
@@ -212,9 +212,7 @@ BACKUP_PATH=C:\custom\backup\path
 ```
 
 **Restore from backup:**
-1. Stop the server
-2. Copy the backup file to `prisma/dev.db`
-3. Restart the server
+See [RESTORE.md](./RESTORE.md) for detailed restore instructions with paths.
 
 ## MCP Server Integration
 

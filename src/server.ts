@@ -73,6 +73,11 @@ app.use(cors({
       return callback(null, true);
     }
     
+    // In development, allow ngrok URLs
+    if (!isProd && (origin.includes('.ngrok.io') || origin.includes('.ngrok.app'))) {
+      return callback(null, true);
+    }
+    
     if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
