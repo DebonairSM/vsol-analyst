@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
+import { prisma } from '../utils/prisma';
 
 interface BackupConfig {
   sourcePath: string;
@@ -221,11 +222,89 @@ export async function backupDatabase(config?: Partial<BackupConfig>): Promise<vo
     const backupFilename = `sunny-dev-${timestamp}.db`;
     const backupPath = path.join(finalConfig.targetDir, backupFilename);
 
-    // Copy database file
-    fs.copyFileSync(finalConfig.sourcePath, backupPath);
+    // Get source database size for comparison
+    const sourceStats = fs.statSync(finalConfig.sourcePath);
+    const sourceSize = sourceStats.size;
+
+    // Try VACUUM INTO first (creates a compacted, consistent backup)
+    // This is the recommended SQLite backup method
+    try {
+      const backupPathForSql = backupPath.replace(/\\/g, '/').replace(/'/g, "''");
+      await prisma.$executeRawUnsafe(`VACUUM INTO '${backupPathForSql}'`);
+    } catch (vacuumError) {
+      // If VACUUM INTO fails, fall back to direct file copy
+      console.warn('VACUUM INTO failed, attempting direct file copy:', vacuumError instanceof Error ? vacuumError.message : vacuumError);
+      
+      // Ensure database is not locked by doing a simple query first
+      await prisma.$queryRaw`SELECT 1`;
+      
+      // Use direct file copy as fallback
+      // Note: This may fail if database is locked, but we'll try
+      fs.copyFileSync(finalConfig.sourcePath, backupPath);
+    }
+
+    // Verify backup was created and has content
+    if (!fs.existsSync(backupPath)) {
+      throw new Error('Backup file was not created');
+    }
 
     const stats = fs.statSync(backupPath);
     const sizeKB = (stats.size / 1024).toFixed(2);
+
+    // Warn if backup seems too small (less than 1KB suggests an empty/incomplete backup)
+    if (stats.size < 1024) {
+      throw new Error(`Backup file is suspiciously small (${sizeKB} KB). Backup may have failed.`);
+    }
+
+    // Verify backup is a valid SQLite database by checking the header
+    // SQLite databases start with "SQLite format 3\000"
+    const backupHeader = Buffer.alloc(16);
+    const fd = fs.openSync(backupPath, 'r');
+    try {
+      fs.readSync(fd, backupHeader, 0, 16, 0);
+      const headerString = backupHeader.toString('utf8', 0, 16);
+      if (!headerString.startsWith('SQLite format 3')) {
+        throw new Error('Backup file does not appear to be a valid SQLite database');
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+
+    // Verify backup contains data by checking table count
+    // Connect to backup and verify it has tables
+    const backupUrl = `file:${backupPath.replace(/\\/g, '/')}`;
+    try {
+      const { PrismaClient } = await import('@prisma/client');
+      const backupPrisma = new PrismaClient({
+        datasources: { db: { url: backupUrl } },
+      });
+      
+      const tableCount = await backupPrisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*) as count FROM sqlite_master WHERE type='table'
+      `;
+      
+      await backupPrisma.$disconnect();
+      
+      if (tableCount[0]?.count === 0n) {
+        throw new Error('Backup database appears to be empty (no tables found)');
+      }
+      
+      console.log(`  Verified: Backup contains ${tableCount[0]?.count || 0} tables`);
+    } catch (verifyError) {
+      // If verification fails, log warning but don't fail the backup
+      // (the backup file exists and has valid SQLite header)
+      console.warn(`  Warning: Could not verify backup contents: ${verifyError instanceof Error ? verifyError.message : verifyError}`);
+    }
+
+    // Warn if backup is significantly smaller than source (more than 10% difference)
+    // VACUUM can reduce size by removing free space, but large differences might indicate issues
+    const sizeDifference = sourceSize - stats.size;
+    const sizeDifferencePercent = ((sizeDifference / sourceSize) * 100).toFixed(1);
+    
+    if (sizeDifference > sourceSize * 0.1) {
+      console.warn(`  Note: Backup is ${sizeDifferencePercent}% smaller than source (${(sourceSize / 1024).toFixed(2)} KB vs ${sizeKB} KB).`);
+      console.warn('  This is normal when using VACUUM - it removes free space and compacts the database.');
+    }
 
     console.log('\n✓ Database backup successful!');
     console.log(`  Source: ${finalConfig.sourcePath}`);

@@ -43,16 +43,17 @@ export function validateTextInput(text: unknown): string {
 }
 
 /**
- * Validate UUID format.
+ * Validate CUID format (Prisma uses CUIDs, not UUIDs).
+ * CUIDs are 25 characters long, start with 'c', and contain alphanumeric characters.
  */
 export function validateUUID(id: unknown): string {
   if (typeof id !== "string") {
     throw new ValidationError("ID must be a string");
   }
 
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const cuidRegex = /^c[0-9a-z]{24}$/;
   
-  if (!uuidRegex.test(id)) {
+  if (!cuidRegex.test(id)) {
     throw new ValidationError("Invalid ID format");
   }
 

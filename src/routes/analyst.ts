@@ -315,11 +315,10 @@ router.post("/extract-stream", requireAuth, async (req, res) => {
 });
 
 // Get saved requirements for a project
-router.get("/requirements/:projectId", requireAuth, async (req, res) => {
-  try {
+router.get("/requirements/:projectId", requireAuth, asyncHandler(async (req, res) => {
     const { projectId } = req.params;
     validateUUID(projectId);
-    const user = req.user as any;
+    const user = getAuthenticatedUser(req.user);
 
     // Verify project ownership
     const project = await prisma.project.findFirst({
@@ -402,11 +401,7 @@ router.get("/requirements/:projectId", requireAuth, async (req, res) => {
       isStale,
       isEmpty: false,
     });
-  } catch (error) {
-    console.error("Error fetching requirements:", error);
-    res.status(500).json({ error: "Failed to fetch requirements" });
-  }
-});
+}));
 
 // Generate user stories endpoint (legacy - re-extracts requirements)
 router.post("/generate-stories", requireAuth, async (req, res) => {
