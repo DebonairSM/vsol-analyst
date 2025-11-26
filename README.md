@@ -418,9 +418,9 @@ The MCP server can run in two modes:
        "sunny": {
          "command": "npm",
          "args": ["run", "mcp"],
-         "cwd": "/path/to/vsol-analyst",
+         "cwd": "C:\\git\\vsol-analyst",
          "env": {
-           "DATABASE_URL": "file:./prisma/dev.db"
+           "DATABASE_URL": "file:./dev.db"
          }
        }
      }
@@ -768,11 +768,76 @@ cloudflared service install
 cloudflared tunnel run vsol-analyst
 ```
 
+#### Production Setup Example: sunny.vsol.software
+
+This example shows how to configure an existing tunnel (`sunny-tunnel`) to route `sunny.vsol.software` to `localhost:5051`.
+
+**Step 1: Configure DNS**
+
+First, in Cloudflare Dashboard → **DNS**, delete any existing record whose **Name** is `sunny`.
+
+Then create the DNS record using cloudflared:
+```powershell
+cloudflared tunnel route dns sunny-tunnel sunny.vsol.software
+```
+
+This creates:
+- **Type:** CNAME
+- **Name:** `sunny`
+- **Target:** `{tunnel-id}.cfargotunnel.com`
+- **Proxy:** Proxied (orange cloud)
+
+**Step 2: Configure the tunnel**
+
+Edit (or create) the configuration file at `C:\Users\<username>\.cloudflared\config.yml`:
+
+```yaml
+tunnel: 5809d6aa-f2d9-4bcf-b30d-67f7b844772c
+
+credentials-file: C:\Users\<username>\.cloudflared\5809d6aa-f2d9-4bcf-b30d-67f7b844772c.json
+
+ingress:
+  - hostname: sunny.vsol.software
+    service: http://localhost:5051
+  - service: http_status:404
+```
+
+**Note:** Replace `<username>` with your Windows username. Verify the credentials file name matches what's in `C:\Users\<username>\.cloudflared\`:
+```powershell
+dir C:\Users\<username>\.cloudflared\
+```
+
+**Step 3: Run the application and tunnel**
+
+Start the development server:
+```powershell
+cd C:\git\vsol-analyst
+npm run dev
+```
+
+In a separate PowerShell window, run the tunnel:
+```powershell
+cloudflared tunnel run sunny-tunnel
+```
+
+The application will be accessible at `https://sunny.vsol.software`.
+
+**Optional: Run tunnel as a Windows service**
+
+Once verified, install the tunnel as a service to start automatically on boot:
+```powershell
+cloudflared service install
+```
+
+After this, you only need to run `npm run dev`; the tunnel will start automatically.
+
 #### Configuration
 
 1. **Update your `.env` file** with your Cloudflare tunnel URL:
    ```env
-   CALLBACK_URL=https://vsol-analyst.yourdomain.com/auth/google/callback
+   CALLBACK_URL=https://sunny.vsol.software/auth/google/callback
+   # Or for other domains:
+   # CALLBACK_URL=https://vsol-analyst.yourdomain.com/auth/google/callback
    # Or if using temporary URL:
    # CALLBACK_URL=https://temporary-url.cfargotunnel.com/auth/google/callback
    ```
@@ -810,6 +875,62 @@ When using tunnels for external access:
 - The application automatically sets the `ngrok-skip-browser-warning` header, so you shouldn't see warnings
 
 **Cloudflare Tunnel connection issues:**
+
+**Missing or mismatched credentials file:**
+
+If you see an error like:
+```
+Tunnel credentials file 'C:\Users\<username>\.cloudflared\<tunnel-id>.json' doesn't exist
+```
+
+The tunnel exists in Cloudflare, but the local credentials file is missing or has a different name.
+
+**Step 1: Check what files you have**
+
+Run:
+```powershell
+dir C:\Users\<username>\.cloudflared\
+```
+
+Look for any `.json` file (for example `sunny-tunnel.json`). That is your credentials file.
+
+**Step 2: Update config.yml to use the correct file**
+
+Open `C:\Users\<username>\.cloudflared\config.yml` and update the `credentials-file` path to match the actual JSON file name:
+
+```yaml
+tunnel: 5809d6aa-f2d9-4bcf-b30d-67f7b844772c
+credentials-file: C:\Users\<username>\.cloudflared\sunny-tunnel.json  # Use actual filename
+
+ingress:
+  - hostname: sunny.vsol.software
+    service: http://localhost:5051
+  - service: http_status:404
+```
+
+**Step 3: If no JSON file exists**
+
+If there is no `.json` file in the folder, delete and recreate the tunnel:
+
+1. Delete the old tunnel:
+   ```powershell
+   cloudflared tunnel delete sunny-tunnel
+   ```
+
+2. Create it again (this downloads a fresh JSON):
+   ```powershell
+   cloudflared tunnel create sunny-tunnel
+   ```
+   This prints the new tunnel ID and creates a new `.json` file.
+
+3. Update `config.yml` with the new tunnel ID and credentials file path.
+
+4. Recreate the DNS route:
+   ```powershell
+   cloudflared tunnel route dns sunny-tunnel sunny.vsol.software
+   ```
+
+**Other issues:**
 - Verify your tunnel credentials are correct in the config file
 - Check that DNS records are properly configured (if using custom domain)
 - Ensure cloudflared service is running (if set up as service)
