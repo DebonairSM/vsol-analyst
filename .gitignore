@@ -57,6 +57,7 @@ vite.config.*.timestamp-*
 *.bak
 *.backup
 *.old
+backups/
 
 # Temporary files
 *.tmp
