@@ -25,6 +25,21 @@ export const ALLOWED_SPREADSHEET_MIMES = [
 export const UPLOAD_DIR_IMAGES = "uploads/images/";
 export const UPLOAD_DIR_SPREADSHEETS = "uploads/spreadsheets/";
 
+/**
+ * Sanitize a user name for use in folder paths.
+ * Removes special characters, replaces spaces with underscores, and limits length.
+ */
+export function sanitizeUserNameForPath(userName: string): string {
+  return userName
+    .trim()
+    .replace(/[^a-zA-Z0-9\s_-]/g, "") // Remove special characters except spaces, dashes, underscores
+    .replace(/\s+/g, "_") // Replace spaces with underscores
+    .replace(/_{2,}/g, "_") // Replace multiple underscores with single
+    .replace(/^_+|_+$/g, "") // Remove leading/trailing underscores
+    .substring(0, 50) // Limit length
+    || "user"; // Fallback if empty
+}
+
 // Default values
 export const DEFAULT_EPIC_ICON = "📦";
 export const DEFAULT_TEMPERATURE_CHAT = 0.4;

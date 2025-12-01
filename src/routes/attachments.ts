@@ -4,10 +4,10 @@ import { prisma } from "../utils/prisma";
 import { getAuthenticatedUser } from "../utils/prisma-helpers";
 import { NotFoundError, ForbiddenError, logError } from "../utils/errors";
 import { asyncHandler } from "../utils/async-handler";
-import { validateAndResolveFilePath } from "../utils/path-validation";
 import { UPLOAD_DIR_IMAGES, UPLOAD_DIR_SPREADSHEETS } from "../utils/constants";
 import { validateUUID } from "../utils/validation";
 import path from "path";
+import fs from "fs";
 
 const router = Router();
 
@@ -37,8 +37,11 @@ router.get("/:id", requireAuth, asyncHandler(async (req, res) => {
     throw new NotFoundError("Attachment");
   }
 
-  // Verify user owns the project
-  if (attachment.session.project.company.userId !== user.id) {
+  // Verify user owns the project, or is an admin
+  const isOwner = attachment.session.project.company.userId === user.id;
+  const isAdmin = user.isAdmin === true;
+  
+  if (!isOwner && !isAdmin) {
     throw new ForbiddenError("Access denied to this attachment");
   }
 
@@ -48,8 +51,25 @@ router.get("/:id", requireAuth, asyncHandler(async (req, res) => {
     ? path.resolve(process.cwd(), UPLOAD_DIR_IMAGES)
     : path.resolve(process.cwd(), UPLOAD_DIR_SPREADSHEETS);
   
-  // Validate and resolve the file path safely
-  const filePath = validateAndResolveFilePath(attachment.storedPath, baseDir);
+  // Resolve storedPath from process.cwd() since it's stored relative to cwd
+  // storedPath format: "uploads/images/{userFolder}/filename" or "uploads/spreadsheets/{userFolder}/filename"
+  const resolvedPath = path.resolve(process.cwd(), attachment.storedPath);
+  
+  // Validate the resolved path is within the correct base directory
+  const normalizedBase = path.normalize(baseDir);
+  const normalizedPath = path.normalize(resolvedPath);
+  
+  // Check that the path is within the base directory
+  if (!normalizedPath.startsWith(normalizedBase + path.sep) && normalizedPath !== normalizedBase) {
+    throw new ForbiddenError("Path traversal detected: Invalid file path");
+  }
+  
+  // Check if file exists
+  if (!fs.existsSync(normalizedPath)) {
+    throw new Error("File does not exist");
+  }
+  
+  const filePath = normalizedPath;
 
   res.setHeader("Content-Type", attachment.mimeType);
   res.setHeader("Content-Disposition", `inline; filename="${attachment.filename}"`);

@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import fs from "fs";
+import path from "path";
 import { requireAuth } from "../auth/middleware";
 import { prisma } from "../utils/prisma";
 import { getAuthenticatedUser, sanitizeForPrisma } from "../utils/prisma-helpers";
@@ -11,6 +12,7 @@ import { createAttachmentResolver } from "../utils/attachment-helpers";
 import { configureSSEHeaders, sendSSEProgress, sendSSEData, sendSSEError, delay } from "../utils/sse-helpers";
 import { validateTextInput, validateUUID } from "../utils/validation";
 import * as constants from "../utils/constants";
+import { sanitizeUserNameForPath } from "../utils/constants";
 import { verifyProjectOwnership, getOrCreateChatSession, updateChatSessionHistory } from "../utils/project-helpers";
 import { escapeSQLIdentifier, generateSafeSQLInsert } from "../utils/sql-escape";
 import { validateSpreadsheetFileType, validateImageFileType } from "../utils/file-type-validation";
@@ -58,13 +60,42 @@ function createFileNameGenerator() {
   };
 }
 
+function createUserSpecificDestination(baseDir: string) {
+  return (req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+    try {
+      // Get user from request (should be available after requireAuth middleware)
+      const user = req.user as any;
+      let userFolder = "unknown";
+      
+      if (user && user.name) {
+        userFolder = sanitizeUserNameForPath(user.name);
+      } else if (user && user.email) {
+        // Fallback to email if name is not available
+        userFolder = sanitizeUserNameForPath(user.email.split("@")[0]);
+      }
+      
+      // Create user-specific directory path
+      const userDir = path.join(baseDir, userFolder);
+      
+      // Ensure directory exists
+      if (!fs.existsSync(userDir)) {
+        fs.mkdirSync(userDir, { recursive: true });
+      }
+      
+      cb(null, userDir);
+    } catch (error) {
+      cb(error as Error, "");
+    }
+  };
+}
+
 const imageStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, constants.UPLOAD_DIR_IMAGES),
+  destination: createUserSpecificDestination(constants.UPLOAD_DIR_IMAGES),
   filename: createFileNameGenerator(),
 });
 
 const spreadsheetStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, constants.UPLOAD_DIR_SPREADSHEETS),
+  destination: createUserSpecificDestination(constants.UPLOAD_DIR_SPREADSHEETS),
   filename: createFileNameGenerator(),
 });
 
@@ -909,10 +940,15 @@ router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), asyn
       JSON.stringify(result.sheets, (key, value) => value === undefined ? null : value)
     );
     
+    // Normalize stored path to be relative to process.cwd() for portability
+    const storedPath = path.isAbsolute(req.file.path)
+      ? path.relative(process.cwd(), req.file.path)
+      : req.file.path;
+    
     const attachment = await prisma.attachment.create({
       data: {
         filename: req.file.originalname,
-        storedPath: req.file.path,
+        storedPath: storedPath,
         fileType: "spreadsheet",
         mimeType: req.file.mimetype,
         parsedData: cleanedParsedData,
@@ -1269,11 +1305,16 @@ router.post("/upload-image", requireAuth, uploadImage.single("file"), async (req
       });
     }
 
+    // Normalize stored path to be relative to process.cwd() for portability
+    const storedPath = path.isAbsolute(req.file.path)
+      ? path.relative(process.cwd(), req.file.path)
+      : req.file.path;
+
     // Create Attachment record
     const attachment = await prisma.attachment.create({
       data: sanitizeForPrisma({
         filename: req.file.originalname,
-        storedPath: req.file.path,
+        storedPath: storedPath,
         fileType: "image",
         mimeType: req.file.mimetype,
         sessionId: chatSession.id,

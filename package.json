@@ -10,6 +10,7 @@
     "mcp": "tsx src/mcp/server.ts",
     "mcp:http": "tsx src/mcp/server-http.ts",
     "backup": "tsx src/backup/database-backup.ts",
+    "migrate:image": "tsx migrate-image.ts",
     "test": "jest",
     "test:watch": "jest --watch"
   },
