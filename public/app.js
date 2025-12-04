@@ -1186,7 +1186,12 @@ async function updateRequirementsButtonStates() {
     if (!currentProject) return;
     
     try {
-        const response = await fetch(`/analyst/requirements/${currentProject.id}`);
+        // Use admin endpoint if in admin view, otherwise use regular endpoint
+        const endpoint = currentProject.isAdminView 
+            ? `/api/admin/projects/${currentProject.id}/requirements`
+            : `/analyst/requirements/${currentProject.id}`;
+        
+        const response = await fetch(endpoint);
         if (response.ok) {
             const data = await response.json();
             
@@ -1549,7 +1554,12 @@ async function generateUserStories() {
         // Use cached requirements if available (faster, no LLM call to re-extract)
         let response;
         if (cachedRequirements) {
-            response = await fetch('/analyst/generate-stories-stream', {
+            // Use admin endpoint if in admin view, otherwise use regular endpoint
+            const endpoint = currentProject.isAdminView 
+                ? `/api/admin/projects/${currentProject.id}/generate-stories-stream`
+                : '/analyst/generate-stories-stream';
+            
+            response = await secureFetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -2158,7 +2168,12 @@ async function generateFlowchart() {
     startTipsRotation(prefix + 'flowchart-tip', flowchartTips);
     
     try {
-        const response = await secureFetch('/analyst/generate-flowchart-stream', {
+        // Use admin endpoint if in admin view, otherwise use regular endpoint
+        const endpoint = currentProject.isAdminView 
+            ? `/api/admin/projects/${currentProject.id}/generate-flowchart-stream`
+            : '/analyst/generate-flowchart-stream';
+        
+        const response = await secureFetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ requirements: cachedRequirements, projectId: currentProject.id })
