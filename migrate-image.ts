@@ -159,3 +159,4 @@ migrateImage()
     console.error("Migration script failed:", error);
     process.exit(1);
   });
+
