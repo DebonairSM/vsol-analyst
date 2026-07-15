@@ -3,7 +3,10 @@ import { RequirementsExtractor } from "./RequirementsExtractor";
 import { DocumentGenerator, MermaidMetrics } from "./DocumentGenerator";
 import { SYSTEM_PROMPT_REFINER } from "./prompts";
 import { RequirementsSummary } from "./RequirementsTypes";
-import { normalizeDiscoveryReadiness } from "./DiscoveryReadiness";
+import {
+  includeIncompleteDiscoveryContext,
+  normalizeDiscoveryReadiness,
+} from "./DiscoveryReadiness";
 
 /**
  * Result of the refinement pipeline, including the final summary,
@@ -312,6 +315,12 @@ export class RequirementsRefinementPipeline {
     }
     await new Promise(resolve => setTimeout(resolve, 1000));
     
+    // Persisted gaps must remain visible even if either model omitted them.
+    finalSummary = includeIncompleteDiscoveryContext(
+      finalSummary,
+      discoveryReadiness
+    );
+
     // 4) Generate final documents
     const docsStartTime = Date.now();
     const markdown = this.docs.generateRequirementsMarkdown(finalSummary);

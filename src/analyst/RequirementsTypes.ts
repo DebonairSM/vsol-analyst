@@ -80,6 +80,7 @@ export interface RequirementsSummary {
   candidateModules: CandidateModule[];
   nonFunctionalNeeds: string[];
   risksAndConstraints: RiskOrConstraint[];
+  assumptions: string[];
   openQuestions: string[];
   uploadedDocuments: UploadedDocument[];
   workflowDiagram: string;

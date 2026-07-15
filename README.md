@@ -134,6 +134,9 @@ Follow these steps to set up the application on a new machine:
    # Allowed CORS origins (optional, comma-separated)
    # If not set, CORS is auto-configured for development
    # ALLOWED_ORIGINS=http://localhost:5051,http://example.com
+
+   # Minimum discovery confidence required to extract without a warning (0 to 1)
+   # DISCOVERY_READINESS_THRESHOLD=0.7
    ```
    
    **Important Notes:**
@@ -275,6 +278,7 @@ These variables have defaults and are optional:
 | `REDIS_URL` | Redis connection URL (for session storage) | Not set (uses in-memory sessions) |
 | `USE_REDIS_SESSIONS` | Enable Redis session store (`true` or `false`) | `false` |
 | `ALLOWED_ORIGINS` | Comma-separated list of allowed CORS origins | Auto-configured for development |
+| `DISCOVERY_READINESS_THRESHOLD` | Confidence from `0` to `1` required to extract without an incomplete-discovery warning | `0.7` |
 
 #### Complete `.env` File Template
 

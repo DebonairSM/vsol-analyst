@@ -1,13 +1,168 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { RequirementsExtractor } from "../src/analyst/RequirementsExtractor";
+import { DocumentGenerator } from "../src/analyst/DocumentGenerator";
 import { ChatMessage, LLMProvider } from "../src/llm/LLMProvider";
 import {
+  assessDiscoveryReadiness,
   buildDiscoveryReadinessPersistenceData,
+  getDiscoveryReadinessThreshold,
+  includeIncompleteDiscoveryContext,
   mergeDiscoveryReadiness,
   normalizeDiscoveryReadiness,
   withDiscoveryReadinessContext,
 } from "../src/analyst/DiscoveryReadiness";
+
+test("readiness threshold is configurable with a safe default", () => {
+  assert.equal(getDiscoveryReadinessThreshold(""), 0.7);
+  assert.equal(getDiscoveryReadinessThreshold("0.85"), 0.85);
+  assert.equal(getDiscoveryReadinessThreshold("85"), 0.7);
+  assert.equal(getDiscoveryReadinessThreshold("not-a-number"), 0.7);
+});
+
+test("thin discovery warning identifies missing and low-confidence areas", () => {
+  const warning = assessDiscoveryReadiness(
+    {
+      status: "in_progress",
+      confidence: 0.45,
+      assumptions: ["Managers approve exceptions"],
+      openQuestions: ["Who owns the final approval?"],
+      sections: [
+        {
+          key: "business_context",
+          status: "not_started",
+          confidence: 0,
+        },
+        {
+          key: "approval_workflow",
+          status: "in_progress",
+          confidence: 0.5,
+          openQuestions: ["Is a second approval required?"],
+        },
+      ],
+    },
+    0.7
+  );
+
+  assert.equal(warning.shouldWarn, true);
+  assert.equal(warning.isBelowThreshold, true);
+  assert.deepEqual(
+    warning.missingAreas.map((area) => area.key),
+    ["business_context"]
+  );
+  assert.deepEqual(
+    warning.lowConfidenceAreas.map((area) => area.key),
+    ["approval_workflow"]
+  );
+  assert.deepEqual(warning.openQuestions, [
+    "Who owns the final approval?",
+    "Is a second approval required?",
+  ]);
+});
+
+test("completed discovery does not show a warning", () => {
+  const warning = assessDiscoveryReadiness(
+    {
+      status: "ready",
+      confidence: 0.9,
+      sections: [
+        {
+          key: "business_context",
+          status: "ready",
+          confidence: 0.9,
+        },
+      ],
+    },
+    0.7
+  );
+
+  assert.equal(warning.shouldWarn, false);
+  assert.deepEqual(warning.missingAreas, []);
+  assert.deepEqual(warning.lowConfidenceAreas, []);
+});
+
+test("configured threshold controls whether the warning is shown", () => {
+  const readiness = {
+    status: "in_progress",
+    confidence: 0.8,
+    sections: [],
+  };
+
+  assert.equal(assessDiscoveryReadiness(readiness, 0.7).shouldWarn, false);
+  assert.equal(assessDiscoveryReadiness(readiness, 0.85).shouldWarn, true);
+});
+
+test("incomplete discovery assumptions and questions are visible in requirements", () => {
+  const requirements = includeIncompleteDiscoveryContext(
+    {
+      businessContext: {},
+      primaryGoal: "Reduce approval delays",
+      secondaryGoals: [],
+      currentTools: [],
+      mainActors: [],
+      painPoints: [],
+      dataEntities: [],
+      candidateModules: [],
+      nonFunctionalNeeds: [],
+      risksAndConstraints: [],
+      assumptions: ["Requests arrive by email"],
+      openQuestions: ["What is the target turnaround time?"],
+      uploadedDocuments: [],
+      workflowDiagram: "flowchart TD",
+    },
+    {
+      status: "in_progress",
+      confidence: 0.4,
+      assumptions: ["Managers approve exceptions"],
+      openQuestions: ["Who owns the final approval?"],
+    },
+    0.7
+  );
+  const markdown = new DocumentGenerator().generateRequirementsMarkdown(
+    requirements
+  );
+
+  assert.deepEqual(requirements.assumptions, [
+    "Requests arrive by email",
+    "Managers approve exceptions",
+  ]);
+  assert.deepEqual(requirements.openQuestions, [
+    "What is the target turnaround time?",
+    "Who owns the final approval?",
+  ]);
+  assert.match(markdown, /## Assumptions/);
+  assert.match(markdown, /Managers approve exceptions/);
+  assert.match(markdown, /## Open Questions/);
+  assert.match(markdown, /Who owns the final approval\?/);
+});
+
+test("requirements keep assumption and question review sections visible when empty", () => {
+  const requirements = includeIncompleteDiscoveryContext(
+    {
+      businessContext: {},
+      primaryGoal: "Clarify the requested system",
+      secondaryGoals: [],
+      currentTools: [],
+      mainActors: [],
+      painPoints: [],
+      dataEntities: [],
+      candidateModules: [],
+      nonFunctionalNeeds: [],
+      risksAndConstraints: [],
+      openQuestions: [],
+      uploadedDocuments: [],
+      workflowDiagram: "flowchart TD",
+    },
+    { status: "not_started", confidence: 0 },
+    0.7
+  );
+  const markdown = new DocumentGenerator().generateRequirementsMarkdown(
+    requirements
+  );
+
+  assert.match(markdown, /## Assumptions\nNo assumptions have been recorded\./);
+  assert.match(markdown, /## Open Questions\nNo open questions have been recorded\./);
+});
 
 test("projects without discovery readiness load with a safe default", () => {
   assert.deepEqual(normalizeDiscoveryReadiness(null), {

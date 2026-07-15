@@ -7,6 +7,7 @@ import { validateProjectName, validateUUID } from "../utils/validation";
 import { NotFoundError, ForbiddenError, ValidationError, logError } from "../utils/errors";
 import { asyncHandler } from "../utils/async-handler";
 import {
+  assessDiscoveryReadiness,
   buildDiscoveryReadinessPersistenceData,
   createEmptyDiscoveryReadiness,
   normalizeDiscoveryReadiness,
@@ -165,6 +166,7 @@ router.get("/:id/readiness", requireAuth, asyncHandler(async (req, res) => {
 
   res.json({
     readiness: normalizeDiscoveryReadiness(project.discoveryReadiness),
+    readinessWarning: assessDiscoveryReadiness(project.discoveryReadiness),
   });
 }));
 

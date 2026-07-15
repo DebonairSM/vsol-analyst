@@ -28,6 +28,7 @@ import { SYSTEM_PROMPT_ANALYST, SYSTEM_PROMPT_POLISHER } from "../analyst/prompt
 import { ChatMessage } from "../llm/LLMProvider";
 import { convertPriorityToDb, convertEffortToDb } from "../analyst/RequirementsTypes";
 import {
+  assessDiscoveryReadiness,
   normalizeDiscoveryReadiness,
   withDiscoveryReadinessContext,
 } from "../analyst/DiscoveryReadiness";
@@ -229,6 +230,7 @@ router.post("/extract", requireAuth, async (req, res) => {
       requirements: result.requirements, 
       markdown: result.markdown, 
       mermaid: result.mermaid,
+      readinessWarning: assessDiscoveryReadiness(project.discoveryReadiness),
       wasRefined: result.wasRefined,
       metrics: result.metrics,
     });
@@ -345,6 +347,7 @@ router.post("/extract-stream", requireAuth, async (req, res) => {
         requirements: result.requirements, 
         markdown: result.markdown, 
         mermaid: result.mermaid,
+        readinessWarning: assessDiscoveryReadiness(project.discoveryReadiness),
         wasRefined: result.wasRefined,
         metrics: result.metrics,
       })}\n\n`);
@@ -408,6 +411,7 @@ router.get("/requirements/:projectId", requireAuth, asyncHandler(async (req, res
       return res.json({
         requirements: null,
         readiness: normalizeDiscoveryReadiness(project.discoveryReadiness),
+        readinessWarning: assessDiscoveryReadiness(project.discoveryReadiness),
         markdown: "",
         mermaid: "",
         detailedFlowchart: "",
@@ -439,6 +443,7 @@ router.get("/requirements/:projectId", requireAuth, asyncHandler(async (req, res
     res.json({
       requirements: project.generatedRequirements,
       readiness: normalizeDiscoveryReadiness(project.discoveryReadiness),
+      readinessWarning: assessDiscoveryReadiness(project.discoveryReadiness),
       markdown: project.requirementsMarkdown || "",
       mermaid: project.requirementsMermaid || "",
       detailedFlowchart: project.detailedFlowchartMermaid || "",
