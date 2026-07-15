@@ -16,6 +16,7 @@ import { RequirementsRefinementPipeline } from "../analyst/RequirementsRefinemen
 import { UserStoryRefinementPipeline } from "../analyst/UserStoryRefinementPipeline";
 import { FlowchartGenerator } from "../analyst/FlowchartGenerator";
 import { convertPriorityToDb, convertEffortToDb } from "../analyst/RequirementsTypes";
+import { normalizeDiscoveryReadiness } from "../analyst/DiscoveryReadiness";
 
 const router = Router();
 
@@ -170,7 +171,8 @@ router.post("/projects/:id/extract", requireAdmin, async (req, res) => {
         (progress: number, stage: string) => {
           console.log(`📊 [Admin Extract - Progress] ${progress}% - ${stage}`);
           sendSSEProgress(res, progress, stage);
-        }
+        },
+        project.discoveryReadiness
       );
       
       sendSSEProgress(res, 95, "Completing...");
@@ -210,6 +212,7 @@ router.get("/projects/:id/requirements", requireAdmin, asyncHandler(async (req, 
       id: true,
       name: true,
       generatedRequirements: true,
+      discoveryReadiness: true,
       generatedUserStories: true,
       requirementsMarkdown: true,
       requirementsMermaid: true,
@@ -239,6 +242,7 @@ router.get("/projects/:id/requirements", requireAdmin, asyncHandler(async (req, 
   if (!project.generatedRequirements) {
     return res.json({
       requirements: null,
+      readiness: normalizeDiscoveryReadiness(project.discoveryReadiness),
       markdown: "",
       mermaid: "",
       detailedFlowchart: "",
@@ -269,6 +273,7 @@ router.get("/projects/:id/requirements", requireAdmin, asyncHandler(async (req, 
 
   res.json({
     requirements: project.generatedRequirements,
+    readiness: normalizeDiscoveryReadiness(project.discoveryReadiness),
     markdown: project.requirementsMarkdown || "",
     mermaid: project.requirementsMermaid || "",
     detailedFlowchart: project.detailedFlowchartMermaid || "",

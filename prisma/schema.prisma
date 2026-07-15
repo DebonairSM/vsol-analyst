@@ -42,6 +42,7 @@ model Project {
   sourceProject            Project?      @relation("ProjectBranch", fields: [sourceProjectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   branchedProjects         Project[]     @relation("ProjectBranch")
   generatedRequirements    Json?
+  discoveryReadiness       Json?
   generatedUserStories     Json?
   requirementsExtractedAt  DateTime?
   requirementsMarkdown     String?

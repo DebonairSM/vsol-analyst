@@ -6,6 +6,11 @@ import { getAuthenticatedUser } from "../utils/prisma-helpers";
 import { validateProjectName, validateUUID } from "../utils/validation";
 import { NotFoundError, ForbiddenError, ValidationError, logError } from "../utils/errors";
 import { asyncHandler } from "../utils/async-handler";
+import {
+  buildDiscoveryReadinessPersistenceData,
+  createEmptyDiscoveryReadiness,
+  normalizeDiscoveryReadiness,
+} from "../analyst/DiscoveryReadiness";
 
 const router = Router();
 
@@ -23,7 +28,14 @@ router.get("/", requireAuth, asyncHandler(async (req, res) => {
   });
 
   // Flatten projects from all companies
-  const projects = companies.flatMap((c) => c.projects);
+  const projects = companies
+    .flatMap((c) => c.projects)
+    .map((project) => ({
+      ...project,
+      discoveryReadiness: normalizeDiscoveryReadiness(
+        project.discoveryReadiness
+      ),
+    }));
   res.json({ projects });
 }));
 
@@ -45,10 +57,18 @@ router.post("/", requireAuth, asyncHandler(async (req, res) => {
     data: {
       name: projectName,
       companyId: company.id,
+      discoveryReadiness: createEmptyDiscoveryReadiness() as any,
     },
   });
 
-  res.json({ project });
+  res.json({
+    project: {
+      ...project,
+      discoveryReadiness: normalizeDiscoveryReadiness(
+        project.discoveryReadiness
+      ),
+    },
+  });
 }));
 
 // Get project details
@@ -79,7 +99,14 @@ router.get("/:id", requireAuth, asyncHandler(async (req, res) => {
     throw new NotFoundError("Project");
   }
 
-  res.json({ project });
+  res.json({
+    project: {
+      ...project,
+      discoveryReadiness: normalizeDiscoveryReadiness(
+        project.discoveryReadiness
+      ),
+    },
+  });
 }));
 
 // Update project
@@ -108,7 +135,73 @@ router.patch("/:id", requireAuth, asyncHandler(async (req, res) => {
     data: { name: projectName },
   });
 
-  res.json({ project });
+  res.json({
+    project: {
+      ...project,
+      discoveryReadiness: normalizeDiscoveryReadiness(
+        project.discoveryReadiness
+      ),
+    },
+  });
+}));
+
+// Get the persisted discovery coverage model for a project.
+router.get("/:id/readiness", requireAuth, asyncHandler(async (req, res) => {
+  const user = getAuthenticatedUser(req.user);
+  const { id } = req.params;
+  validateUUID(id);
+
+  const project = await prisma.project.findFirst({
+    where: {
+      id,
+      company: { userId: user.id },
+    },
+    select: { discoveryReadiness: true },
+  });
+
+  if (!project) {
+    throw new NotFoundError("Project");
+  }
+
+  res.json({
+    readiness: normalizeDiscoveryReadiness(project.discoveryReadiness),
+  });
+}));
+
+// Patch readiness independently so requirements corrected by the user are untouched.
+router.patch("/:id/readiness", requireAuth, asyncHandler(async (req, res) => {
+  const user = getAuthenticatedUser(req.user);
+  const { id } = req.params;
+  validateUUID(id);
+  const patch = req.body?.readiness ?? req.body;
+
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+    throw new ValidationError("readiness object is required");
+  }
+
+  const project = await prisma.project.findFirst({
+    where: {
+      id,
+      company: { userId: user.id },
+    },
+    select: { discoveryReadiness: true },
+  });
+
+  if (!project) {
+    throw new NotFoundError("Project");
+  }
+
+  const updateData = buildDiscoveryReadinessPersistenceData(
+    project.discoveryReadiness,
+    patch
+  );
+
+  await prisma.project.update({
+    where: { id },
+    data: updateData as any,
+  });
+
+  res.json({ readiness: updateData.discoveryReadiness });
 }));
 
 // Get all user stories for a project
@@ -493,6 +586,9 @@ router.post("/:id/branch", requireAuth, asyncHandler(async (req, res) => {
       name: projectName,
       companyId: sourceProject.companyId,
       sourceProjectId: sourceProject.id,
+      discoveryReadiness: normalizeDiscoveryReadiness(
+        sourceProject.discoveryReadiness
+      ) as any,
     },
   });
 

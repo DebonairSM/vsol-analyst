@@ -1,13 +1,15 @@
 import { LLMProvider, ChatMessage } from "../llm/LLMProvider";
 import { SYSTEM_PROMPT_EXTRACTOR } from "./prompts";
 import { RequirementsSummary } from "./RequirementsTypes";
+import { formatDiscoveryReadinessContext } from "./DiscoveryReadiness";
 
 export class RequirementsExtractor {
   constructor(private llm: LLMProvider) {}
 
   async extractFromTranscript(
     history: ChatMessage[],
-    resolveAttachment?: (id: string) => Promise<string | null>
+    resolveAttachment?: (id: string) => Promise<string | null>,
+    discoveryReadiness?: unknown
   ): Promise<RequirementsSummary> {
     // Build a transcript from the history, handling multimodal content
     const transcriptParts: string[] = [];
@@ -35,6 +37,8 @@ export class RequirementsExtractor {
     }
     
     const transcript = transcriptParts.join("\n\n");
+    const readinessContext = formatDiscoveryReadinessContext(discoveryReadiness);
+    const extractionPrompt = `${transcript}\n\n${readinessContext}`;
 
     // For extraction, we'll include images in the context for vision analysis
     const extractionMessages: ChatMessage[] = [
@@ -51,13 +55,13 @@ export class RequirementsExtractor {
       // Include the full multimodal history for vision context
       extractionMessages.push({
         role: "user",
-        content: `Please analyze the following conversation and any images to extract software requirements. Pay special attention to any UI mockups, diagrams, or wireframes in the images.\n\n${transcript}`,
+        content: `Please analyze the following conversation and any images to extract software requirements. Pay special attention to any UI mockups, diagrams, or wireframes in the images.\n\n${extractionPrompt}`,
       });
     } else {
       // No images, just use the transcript
       extractionMessages.push({
         role: "user",
-        content: transcript,
+        content: extractionPrompt,
       });
     }
 

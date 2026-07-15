@@ -27,6 +27,10 @@ import { FlowchartGenerator } from "../analyst/FlowchartGenerator";
 import { SYSTEM_PROMPT_ANALYST, SYSTEM_PROMPT_POLISHER } from "../analyst/prompts";
 import { ChatMessage } from "../llm/LLMProvider";
 import { convertPriorityToDb, convertEffortToDb } from "../analyst/RequirementsTypes";
+import {
+  normalizeDiscoveryReadiness,
+  withDiscoveryReadinessContext,
+} from "../analyst/DiscoveryReadiness";
 
 const router = Router();
 
@@ -141,13 +145,20 @@ router.post("/chat", requireAuth, asyncHandler(async (req, res) => {
   // Get or create chat session
   const firstName = user.name.split(" ")[0];
   const session = await getOrCreateChatSession(projectId, firstName);
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { discoveryReadiness: true },
+  });
 
   // Add user message
   session.history.push({ role: "user", content: message });
 
   // Get AI reply
   const reply = await llmMini.chat({
-    messages: session.history,
+    messages: withDiscoveryReadinessContext(
+      session.history,
+      project?.discoveryReadiness
+    ),
     temperature: constants.DEFAULT_TEMPERATURE_CHAT,
     resolveAttachment: createAttachmentResolver(),
   });
@@ -209,7 +220,9 @@ router.post("/extract", requireAuth, async (req, res) => {
     // Use the refinement pipeline instead of direct extraction
     const result = await refinementPipeline.extractWithRefinement(
       history,
-      resolveAttachment
+      resolveAttachment,
+      undefined,
+      project.discoveryReadiness
     );
 
     res.json({ 
@@ -300,7 +313,8 @@ router.post("/extract-stream", requireAuth, async (req, res) => {
           // Progress callback from pipeline
           console.log(`📊 [Progress Update] ${progress}% - ${stage}`);
           sendProgress(progress, stage);
-        }
+        },
+        project.discoveryReadiness
       );
       
       sendProgress(95, "Completing...");
@@ -363,6 +377,7 @@ router.get("/requirements/:projectId", requireAuth, asyncHandler(async (req, res
         id: true,
         name: true,
         generatedRequirements: true,
+        discoveryReadiness: true,
         generatedUserStories: true,
         requirementsMarkdown: true,
         requirementsMermaid: true,
@@ -392,6 +407,7 @@ router.get("/requirements/:projectId", requireAuth, asyncHandler(async (req, res
     if (!project.generatedRequirements) {
       return res.json({
         requirements: null,
+        readiness: normalizeDiscoveryReadiness(project.discoveryReadiness),
         markdown: "",
         mermaid: "",
         detailedFlowchart: "",
@@ -422,6 +438,7 @@ router.get("/requirements/:projectId", requireAuth, asyncHandler(async (req, res
 
     res.json({
       requirements: project.generatedRequirements,
+      readiness: normalizeDiscoveryReadiness(project.discoveryReadiness),
       markdown: project.requirementsMarkdown || "",
       mermaid: project.requirementsMermaid || "",
       detailedFlowchart: project.detailedFlowchartMermaid || "",
@@ -482,7 +499,8 @@ router.post("/generate-stories", requireAuth, async (req, res) => {
     // First extract requirements from the transcript
     const requirements = await extractor.extractFromTranscript(
       history,
-      resolveAttachment
+      resolveAttachment,
+      project.discoveryReadiness
     );
 
     // Then generate user stories with refinement pipeline
@@ -978,7 +996,10 @@ router.post("/upload-excel", requireAuth, uploadSpreadsheet.single("file"), asyn
 
     // Add an acknowledgment from the assistant
     const acknowledgment = await llmMini.chat({
-      messages: history,
+      messages: withDiscoveryReadinessContext(
+        history,
+        project.discoveryReadiness
+      ),
       temperature: 0.4,
       resolveAttachment,
     });
@@ -1359,7 +1380,10 @@ router.post("/upload-image", requireAuth, uploadImage.single("file"), async (req
     };
 
     const analysis = await llmMini.chat({
-      messages: tempHistory as ChatMessage[],
+      messages: withDiscoveryReadinessContext(
+        tempHistory as ChatMessage[],
+        project.discoveryReadiness
+      ),
       temperature: 0.4,
       resolveAttachment,
     });
