@@ -3,6 +3,7 @@ import { RequirementsExtractor } from "./RequirementsExtractor";
 import { DocumentGenerator, MermaidMetrics } from "./DocumentGenerator";
 import { SYSTEM_PROMPT_REFINER } from "./prompts";
 import { RequirementsSummary } from "./RequirementsTypes";
+import { normalizeDiscoveryReadiness } from "./DiscoveryReadiness";
 
 /**
  * Result of the refinement pipeline, including the final summary,
@@ -97,7 +98,8 @@ export class RequirementsRefinementPipeline {
   private async refineRequirements(
     transcript: string,
     original: RequirementsSummary,
-    metrics: MermaidMetrics
+    metrics: MermaidMetrics,
+    discoveryReadiness?: unknown
   ): Promise<RequirementsSummary> {
     try {
       // Build the refinement prompt
@@ -105,6 +107,7 @@ export class RequirementsRefinementPipeline {
         transcript,
         originalRequirementsSummary: original,
         mermaidDiagnostics: metrics,
+        discoveryReadiness: normalizeDiscoveryReadiness(discoveryReadiness),
       };
 
       const json = await this.llmFull.chat({
@@ -139,7 +142,8 @@ export class RequirementsRefinementPipeline {
   async extractWithRefinement(
     history: ChatMessage[],
     resolveAttachment?: (id: string) => Promise<string | null>,
-    onProgress?: (progress: number, stage: string) => void
+    onProgress?: (progress: number, stage: string) => void,
+    discoveryReadiness?: unknown
   ): Promise<RefinementPipelineResult> {
     const startTime = Date.now();
     console.log("🚀 [Requirements Extraction] Starting with gpt-4o-mini");
@@ -184,7 +188,8 @@ export class RequirementsRefinementPipeline {
     const extractionStartTime = Date.now();
     const baseSummary = await this.extractor.extractFromTranscript(
       history,
-      resolveAttachment
+      resolveAttachment,
+      discoveryReadiness
     );
     const extractionDuration = Date.now() - extractionStartTime;
     console.log(`⏱️  [Timing] Extraction took ${(extractionDuration / 1000).toFixed(2)}s`);
@@ -250,7 +255,12 @@ export class RequirementsRefinementPipeline {
       
       const refinementStartTime = Date.now();
       const transcript = this.buildTranscript(history);
-      finalSummary = await this.refineRequirements(transcript, baseSummary, metrics);
+      finalSummary = await this.refineRequirements(
+        transcript,
+        baseSummary,
+        metrics,
+        discoveryReadiness
+      );
       const refinementDuration = Date.now() - refinementStartTime;
       console.log(`⏱️  [Timing] Refinement took ${(refinementDuration / 1000).toFixed(2)}s`);
       wasRefined = true;
