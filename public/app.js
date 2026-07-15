@@ -351,6 +351,7 @@ async function showChat(project) {
     const settingsPage = document.getElementById('settings-page');
     currentProject = project;
     projectTitle.textContent = project.name;
+    renderDiscoveryMode(project);
     chatContainer.innerHTML = '';
     cachedRequirements = null; // Clear cached requirements when switching projects
     
@@ -544,6 +545,11 @@ function displayProjects(projects) {
         const nameDiv = document.createElement('div');
         nameDiv.className = 'project-name';
         nameDiv.textContent = project.name;
+
+        const modeBadge = document.createElement('span');
+        modeBadge.className = 'discovery-mode-badge';
+        modeBadge.textContent = discoveryModeLabel(project.discoveryReadiness?.mode);
+        nameDiv.appendChild(modeBadge);
         
         const dateDiv = document.createElement('div');
         dateDiv.className = 'project-date';
@@ -636,6 +642,8 @@ async function loadChatHistory(projectId) {
         
         const data = await response.json();
         const project = data.project;
+        currentProject = { ...currentProject, ...project };
+        renderDiscoveryMode(currentProject);
         
         // Display chat history if it exists
         if (project.sessions && project.sessions.length > 0) {
@@ -664,6 +672,55 @@ async function loadChatHistory(projectId) {
         // Show welcome message as fallback
         const firstName = currentUser.name.split(' ')[0];
         addMessage('assistant', `Hello, ${firstName}! I'm Sunny, your friendly agent. I'll be working in the System Analyst role for "${currentProject.name}", where I'll help you identify your requirements, document your business processes, and create comprehensive specifications. Do you have any questions about what a Systems Analyst agent does, or shall we get started?`);
+    }
+}
+
+const discoveryModeLabels = {
+    quick_scope: 'Quick Scope',
+    deep_workflow: 'Deep Workflow',
+    mvp_definition: 'MVP Definition',
+    integration_heavy: 'Integration Heavy',
+    data_migration: 'Data Migration'
+};
+
+function discoveryModeLabel(mode) {
+    return discoveryModeLabels[mode] || discoveryModeLabels.quick_scope;
+}
+
+function renderDiscoveryMode(project) {
+    const control = document.getElementById('discovery-mode-control');
+    const select = document.getElementById('discovery-mode-select');
+    if (!control || !select) return;
+
+    const mode = project?.discoveryReadiness?.mode || 'quick_scope';
+    select.value = mode;
+    select.disabled = Boolean(project?.isAdminView);
+    control.title = `Sunny is using ${discoveryModeLabel(mode)} for this project.`;
+}
+
+async function updateDiscoveryMode(mode) {
+    if (!currentProject || currentProject.isAdminView) return;
+    const select = document.getElementById('discovery-mode-select');
+    select.disabled = true;
+
+    try {
+        const response = await secureFetch(`/api/projects/${currentProject.id}/discovery-mode`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode })
+        });
+        if (!response.ok) throw new Error('Failed to update discovery mode');
+
+        const data = await response.json();
+        currentProject.discoveryReadiness = data.readiness;
+        renderDiscoveryMode(currentProject);
+        showToast(`Discovery mode changed to ${data.profile.label}. Your existing chat and requirements are unchanged.`, 'success');
+    } catch (error) {
+        console.error('Error updating discovery mode:', error);
+        renderDiscoveryMode(currentProject);
+        showToast('Failed to update discovery mode', 'error');
+    } finally {
+        select.disabled = false;
     }
 }
 

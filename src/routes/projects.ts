@@ -10,7 +10,10 @@ import {
   assessDiscoveryReadiness,
   buildDiscoveryReadinessPersistenceData,
   createEmptyDiscoveryReadiness,
+  getDiscoveryModeProfile,
+  isDiscoveryMode,
   normalizeDiscoveryReadiness,
+  setDiscoveryMode,
 } from "../analyst/DiscoveryReadiness";
 
 const router = Router();
@@ -204,6 +207,41 @@ router.patch("/:id/readiness", requireAuth, asyncHandler(async (req, res) => {
   });
 
   res.json({ readiness: updateData.discoveryReadiness });
+}));
+
+// Change the discovery approach without replacing chat history or requirements.
+router.patch("/:id/discovery-mode", requireAuth, asyncHandler(async (req, res) => {
+  const user = getAuthenticatedUser(req.user);
+  const { id } = req.params;
+  validateUUID(id);
+  const { mode } = req.body ?? {};
+
+  if (!isDiscoveryMode(mode)) {
+    throw new ValidationError(
+      "mode must be quick_scope, deep_workflow, mvp_definition, integration_heavy, or data_migration"
+    );
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id, company: { userId: user.id } },
+    select: { discoveryReadiness: true },
+  });
+
+  if (!project) {
+    throw new NotFoundError("Project");
+  }
+
+  const readiness = setDiscoveryMode(project.discoveryReadiness, mode);
+  await prisma.project.update({
+    where: { id },
+    data: { discoveryReadiness: readiness as any },
+  });
+
+  res.json({
+    readiness,
+    profile: getDiscoveryModeProfile(mode),
+    readinessWarning: assessDiscoveryReadiness(readiness),
+  });
 }));
 
 // Get all user stories for a project

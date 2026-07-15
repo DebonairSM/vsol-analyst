@@ -1,6 +1,7 @@
 import {
   type DiscoveryClarificationItem,
   type DiscoveryReadiness,
+  getDiscoveryModeProfile,
   normalizeDiscoveryReadiness,
   withDiscoveryReadinessContext,
 } from "./DiscoveryReadiness";
@@ -180,8 +181,12 @@ export function formatDiscoveryConversationInstructions(
   readinessValue: unknown
 ): string {
   const readiness = normalizeDiscoveryReadiness(readinessValue);
+  const profile = getDiscoveryModeProfile(readiness.mode);
   return [
     "Discovery clarification control:",
+    `Selected discovery mode: ${profile.label}. ${profile.description}`,
+    `Emphasize this checklist: ${profile.focusAreas.join(", ")}.`,
+    `Mode-specific question style: ${profile.questionStyle}`,
     "Return one JSON object with a client-facing `reply` string and one `discoveryAction`.",
     "The action is {type:'ask', itemKey, question, knownContext}, {type:'park', itemKey, knownContext}, {type:'resolve', itemKey, answer}, or {type:'none'}.",
     "Use one stable itemKey for the same unresolved point. Every ask must use a genuinely different concrete phrasing.",

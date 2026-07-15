@@ -6,10 +6,12 @@ import { ChatMessage, LLMProvider } from "../src/llm/LLMProvider";
 import {
   assessDiscoveryReadiness,
   buildDiscoveryReadinessPersistenceData,
+  getDiscoveryModeProfile,
   getDiscoveryReadinessThreshold,
   includeIncompleteDiscoveryContext,
   mergeDiscoveryReadiness,
   normalizeDiscoveryReadiness,
+  setDiscoveryMode,
   withDiscoveryReadinessContext,
 } from "../src/analyst/DiscoveryReadiness";
 
@@ -167,6 +169,7 @@ test("requirements keep assumption and question review sections visible when emp
 test("projects without discovery readiness load with a safe default", () => {
   assert.deepEqual(normalizeDiscoveryReadiness(null), {
     version: 1,
+    mode: "quick_scope",
     status: "not_started",
     confidence: 0,
     attempts: 0,
@@ -175,6 +178,52 @@ test("projects without discovery readiness load with a safe default", () => {
     openQuestions: [],
     clarificationItems: [],
   });
+});
+
+test("discovery modes expose distinct checklist and question guidance", () => {
+  const quick = getDiscoveryModeProfile("quick_scope");
+  const migration = getDiscoveryModeProfile("data_migration");
+
+  assert.equal(quick.label, "Quick Scope");
+  assert.deepEqual(quick.focusAreas, ["business_context"]);
+  assert.match(migration.questionStyle, /source data/i);
+  assert.ok(migration.focusAreas.includes("cutover_and_rollback"));
+});
+
+test("changing discovery mode preserves accumulated readiness state", () => {
+  const current = normalizeDiscoveryReadiness({
+    mode: "quick_scope",
+    status: "in_progress",
+    confidence: 0.65,
+    assumptions: ["Operators own exceptions"],
+    openQuestions: ["What is the cutover window?"],
+    sections: [{ key: "business_context", status: "ready", confidence: 0.9 }],
+  });
+
+  const updated = setDiscoveryMode(current, "data_migration");
+
+  assert.equal(updated.mode, "data_migration");
+  assert.equal(updated.confidence, 0.65);
+  assert.deepEqual(updated.assumptions, current.assumptions);
+  assert.deepEqual(updated.openQuestions, current.openQuestions);
+  assert.deepEqual(updated.sections, current.sections);
+});
+
+test("selected mode changes readiness emphasis and scoring", () => {
+  const base = {
+    status: "ready",
+    confidence: 0.9,
+    sections: [{ key: "business_context", status: "ready", confidence: 0.9 }],
+  };
+  const quick = assessDiscoveryReadiness({ ...base, mode: "quick_scope" }, 0.7);
+  const integration = assessDiscoveryReadiness(
+    { ...base, mode: "integration_heavy" },
+    0.7
+  );
+
+  assert.equal(quick.shouldWarn, false);
+  assert.equal(integration.shouldWarn, true);
+  assert.ok(integration.missingAreas.some((area) => area.key === "data_contracts"));
 });
 
 test("readiness patches preserve readiness fields that are not updated", () => {

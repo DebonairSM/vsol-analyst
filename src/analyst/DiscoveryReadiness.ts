@@ -1,6 +1,62 @@
 export const DISCOVERY_READINESS_VERSION = 1 as const;
 export const DEFAULT_DISCOVERY_READINESS_THRESHOLD = 0.7;
 
+export const DISCOVERY_MODES = [
+  "quick_scope",
+  "deep_workflow",
+  "mvp_definition",
+  "integration_heavy",
+  "data_migration",
+] as const;
+
+export type DiscoveryMode = (typeof DISCOVERY_MODES)[number];
+
+export interface DiscoveryModeProfile {
+  id: DiscoveryMode;
+  label: string;
+  description: string;
+  questionStyle: string;
+  focusAreas: string[];
+}
+
+const DISCOVERY_MODE_PROFILES: Record<DiscoveryMode, DiscoveryModeProfile> = {
+  quick_scope: {
+    id: "quick_scope",
+    label: "Quick Scope",
+    description: "Clarify the outcome, boundaries, and main business context quickly.",
+    questionStyle: "Ask concise, high-signal questions and prefer a usable scope over exhaustive detail.",
+    focusAreas: ["business_context"],
+  },
+  deep_workflow: {
+    id: "deep_workflow",
+    label: "Deep Workflow",
+    description: "Map the end-to-end workflow, roles, decisions, and exception paths.",
+    questionStyle: "Walk through concrete scenarios step by step, including handoffs, decisions, and exceptions.",
+    focusAreas: ["current_workflow", "roles_and_handoffs", "exceptions_and_approvals"],
+  },
+  mvp_definition: {
+    id: "mvp_definition",
+    label: "MVP Definition",
+    description: "Separate the first releasable outcome from later enhancements.",
+    questionStyle: "Use prioritization and trade-off questions that distinguish must-haves from later scope.",
+    focusAreas: ["primary_outcome", "must_have_scope", "success_metrics"],
+  },
+  integration_heavy: {
+    id: "integration_heavy",
+    label: "Integration Heavy",
+    description: "Define system boundaries, contracts, security, failure handling, and ownership.",
+    questionStyle: "Ask precise interface questions about systems, data contracts, authentication, failures, and operators.",
+    focusAreas: ["connected_systems", "data_contracts", "security_and_access", "failure_operations"],
+  },
+  data_migration: {
+    id: "data_migration",
+    label: "Data Migration",
+    description: "Plan source-to-target mapping, data quality, cutover, validation, and rollback.",
+    questionStyle: "Ask evidence-based questions about source data, mappings, quality rules, reconciliation, and cutover safety.",
+    focusAreas: ["source_data", "target_mapping", "data_quality", "cutover_and_rollback"],
+  },
+};
+
 export type DiscoveryReadinessStatus =
   | "not_started"
   | "in_progress"
@@ -31,6 +87,7 @@ export interface DiscoveryClarificationItem {
 
 export interface DiscoveryReadiness {
   version: typeof DISCOVERY_READINESS_VERSION;
+  mode: DiscoveryMode;
   status: DiscoveryReadinessStatus;
   confidence: number;
   attempts: number;
@@ -50,6 +107,7 @@ export interface DiscoveryReadinessSectionPatch {
 }
 
 export interface DiscoveryReadinessPatch {
+  mode?: DiscoveryMode;
   status?: DiscoveryReadinessStatus;
   confidence?: number;
   attempts?: number;
@@ -66,6 +124,9 @@ export interface DiscoveryReadinessArea {
 }
 
 export interface DiscoveryReadinessAssessment {
+  mode: DiscoveryMode;
+  modeLabel: string;
+  focusAreas: string[];
   shouldWarn: boolean;
   isBelowThreshold: boolean;
   threshold: number;
@@ -77,9 +138,12 @@ export interface DiscoveryReadinessAssessment {
   openQuestions: string[];
 }
 
-export function createEmptyDiscoveryReadiness(): DiscoveryReadiness {
+export function createEmptyDiscoveryReadiness(
+  mode: DiscoveryMode = "quick_scope"
+): DiscoveryReadiness {
   return {
     version: DISCOVERY_READINESS_VERSION,
+    mode,
     status: "not_started",
     confidence: 0,
     attempts: 0,
@@ -102,6 +166,7 @@ export function normalizeDiscoveryReadiness(
 
   return {
     version: DISCOVERY_READINESS_VERSION,
+    mode: normalizeDiscoveryMode(candidate.mode),
     status: normalizeStatus(candidate.status, empty.status),
     confidence: normalizeConfidence(candidate.confidence, empty.confidence),
     attempts: normalizeAttempts(candidate.attempts, empty.attempts),
@@ -144,6 +209,10 @@ export function mergeDiscoveryReadiness(
 
   return {
     version: DISCOVERY_READINESS_VERSION,
+    mode:
+      patch.mode === undefined
+        ? current.mode
+        : normalizeDiscoveryMode(patch.mode, current.mode),
     status: normalizeStatus(patch.status, current.status),
     confidence: normalizeConfidence(patch.confidence, current.confidence),
     attempts: normalizeAttempts(patch.attempts, current.attempts),
@@ -174,10 +243,14 @@ export function buildDiscoveryReadinessPersistenceData(
 
 export function formatDiscoveryReadinessContext(value: unknown): string {
   const readiness = normalizeDiscoveryReadiness(value);
+  const profile = getDiscoveryModeProfile(readiness.mode);
 
   return [
     "Discovery readiness context (persisted project coverage and gaps):",
     JSON.stringify(readiness, null, 2),
+    `Selected discovery mode: ${profile.label}. ${profile.description}`,
+    `Mode focus checklist: ${profile.focusAreas.join(", ")}.`,
+    `Question style: ${profile.questionStyle}`,
     "Use this as supporting context. Explicit user statements and user-corrected requirements are authoritative; do not replace them with readiness assumptions. Keep unresolved readiness questions visible in the extracted requirements where relevant.",
   ].join("\n");
 }
@@ -200,6 +273,7 @@ export function assessDiscoveryReadiness(
   threshold = getDiscoveryReadinessThreshold()
 ): DiscoveryReadinessAssessment {
   const readiness = normalizeDiscoveryReadiness(value);
+  const profile = getDiscoveryModeProfile(readiness.mode);
   const safeThreshold =
     Number.isFinite(threshold) && threshold >= 0 && threshold <= 1
       ? threshold
@@ -208,6 +282,14 @@ export function assessDiscoveryReadiness(
   const missingAreas = readiness.sections
     .filter((section) => section.status === "not_started")
     .map(toReadinessArea);
+  const sectionsByKey = new Map(
+    readiness.sections.map((section) => [section.key.toLocaleLowerCase(), section])
+  );
+  for (const focusArea of profile.focusAreas) {
+    if (!sectionsByKey.has(focusArea.toLocaleLowerCase())) {
+      missingAreas.push({ key: focusArea, status: "not_started", confidence: 0 });
+    }
+  }
   const lowConfidenceAreas = readiness.sections
     .filter(
       (section) =>
@@ -216,8 +298,23 @@ export function assessDiscoveryReadiness(
     )
     .map(toReadinessArea);
 
-  const isBelowThreshold = readiness.confidence < safeThreshold;
-  const shouldWarn = isBelowThreshold;
+  const coveredFocusAreas = profile.focusAreas
+    .map((key) => sectionsByKey.get(key.toLocaleLowerCase()))
+    .filter((section): section is DiscoveryReadinessSection => Boolean(section));
+  const focusConfidence = coveredFocusAreas.length
+    ? coveredFocusAreas.reduce((sum, section) => sum + section.confidence, 0) /
+      coveredFocusAreas.length
+    : readiness.confidence;
+  const adjustedConfidence = coveredFocusAreas.length
+    ? readiness.confidence * 0.4 + focusConfidence * 0.6
+    : readiness.confidence;
+  const isBelowThreshold = adjustedConfidence < safeThreshold;
+  const hasMissingFocusAreas =
+    (readiness.mode !== "quick_scope" || readiness.sections.length > 0) &&
+    profile.focusAreas.some(
+      (key) => !sectionsByKey.has(key.toLocaleLowerCase())
+    );
+  const shouldWarn = isBelowThreshold || hasMissingFocusAreas;
 
   // A newly created or sparsely populated readiness record has no named
   // sections. Keep the warning useful by exposing the overall discovery area.
@@ -225,7 +322,7 @@ export function assessDiscoveryReadiness(
     const overallArea: DiscoveryReadinessArea = {
       key: "overall_discovery",
       status: readiness.status,
-      confidence: readiness.confidence,
+      confidence: adjustedConfidence,
     };
 
     if (readiness.status === "not_started") {
@@ -241,10 +338,13 @@ export function assessDiscoveryReadiness(
   );
 
   return {
+    mode: readiness.mode,
+    modeLabel: profile.label,
+    focusAreas: [...profile.focusAreas],
     shouldWarn,
     isBelowThreshold,
     threshold: safeThreshold,
-    confidence: readiness.confidence,
+    confidence: adjustedConfidence,
     status: readiness.status,
     missingAreas,
     lowConfidenceAreas,
@@ -257,6 +357,32 @@ export function assessDiscoveryReadiness(
       ...incompleteSections.map((section) => section.openQuestions)
     ),
   };
+}
+
+export function isDiscoveryMode(value: unknown): value is DiscoveryMode {
+  return (
+    typeof value === "string" &&
+    (DISCOVERY_MODES as readonly string[]).includes(value)
+  );
+}
+
+export function normalizeDiscoveryMode(
+  value: unknown,
+  fallback: DiscoveryMode = "quick_scope"
+): DiscoveryMode {
+  return isDiscoveryMode(value) ? value : fallback;
+}
+
+export function getDiscoveryModeProfile(value: unknown): DiscoveryModeProfile {
+  const profile = DISCOVERY_MODE_PROFILES[normalizeDiscoveryMode(value)];
+  return { ...profile, focusAreas: [...profile.focusAreas] };
+}
+
+export function setDiscoveryMode(
+  currentValue: unknown,
+  mode: DiscoveryMode
+): DiscoveryReadiness {
+  return mergeDiscoveryReadiness(currentValue, { mode });
 }
 
 export function includeIncompleteDiscoveryContext<

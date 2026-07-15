@@ -461,6 +461,40 @@
             color: #111827;
         }
 
+        .discovery-mode-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: auto;
+            margin-right: 1rem;
+        }
+
+        .discovery-mode-control label {
+            color: #5f6b7a;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .discovery-mode-control select {
+            border: 1px solid #d7dde5;
+            border-radius: 6px;
+            background: white;
+            color: #2c3e50;
+            padding: 0.45rem 0.6rem;
+        }
+
+        .discovery-mode-badge {
+            display: inline-block;
+            margin-left: 0.5rem;
+            padding: 0.15rem 0.45rem;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #4338ca;
+            font-size: 0.72rem;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+
         .back-btn {
             background: #9ca3af;
             color: white;
@@ -2274,6 +2308,16 @@
         <div id="chat-page">
             <div class="chat-header">
                 <h2 id="project-title">Project</h2>
+                <div class="discovery-mode-control" id="discovery-mode-control">
+                    <label for="discovery-mode-select">Discovery mode</label>
+                    <select id="discovery-mode-select" aria-label="Discovery mode" onchange="updateDiscoveryMode(this.value)">
+                        <option value="quick_scope">Quick Scope</option>
+                        <option value="deep_workflow">Deep Workflow</option>
+                        <option value="mvp_definition">MVP Definition</option>
+                        <option value="integration_heavy">Integration Heavy</option>
+                        <option value="data_migration">Data Migration</option>
+                    </select>
+                </div>
                 <button class="back-btn" onclick="backToProjects()">← Back to Projects</button>
             </div>
             <div id="chat-container"></div>
