@@ -85,6 +85,13 @@ export interface BusinessTerm {
   clarificationQuestion?: string;
 }
 
+export interface ExpensiveMissRequirement {
+  category: string;
+  label: string;
+  question: string;
+  status: "missing" | "low_confidence";
+}
+
 export interface RequirementsSummary {
   businessContext: BusinessContext;
   /** A short business-review overview written in the client's language. */
@@ -102,6 +109,7 @@ export interface RequirementsSummary {
   risksAndConstraints: RiskOrConstraint[];
   assumptions: string[];
   openQuestions: string[];
+  expensiveMisses?: ExpensiveMissRequirement[];
   // Optional for compatibility with requirements generated before this field existed.
   ubiquitousLanguage?: BusinessTerm[];
   uploadedDocuments: UploadedDocument[];

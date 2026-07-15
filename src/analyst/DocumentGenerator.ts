@@ -92,6 +92,17 @@ export class DocumentGenerator {
       lines.push("No open questions have been recorded.");
     }
     lines.push("");
+
+    if (req.expensiveMisses?.length) {
+      lines.push(`## Expensive Gaps to Resolve`);
+      lines.push(
+        "These unresolved areas can cause costly rework if they are decided late."
+      );
+      for (const finding of req.expensiveMisses) {
+        lines.push(`- **${finding.label}:** ${finding.question}`);
+      }
+      lines.push("");
+    }
     
     // Business Context
     if (req.businessContext.companyName) {
