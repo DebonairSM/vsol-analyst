@@ -32,6 +32,7 @@ import {
   normalizeDiscoveryReadiness,
   withDiscoveryReadinessContext,
 } from "../analyst/DiscoveryReadiness";
+import { continueDiscoveryConversation } from "../analyst/DiscoveryConversation";
 
 const router = Router();
 
@@ -155,20 +156,25 @@ router.post("/chat", requireAuth, asyncHandler(async (req, res) => {
   session.history.push({ role: "user", content: message });
 
   // Get AI reply
-  const reply = await llmMini.chat({
-    messages: withDiscoveryReadinessContext(
-      session.history,
-      project?.discoveryReadiness
-    ),
-    temperature: constants.DEFAULT_TEMPERATURE_CHAT,
-    resolveAttachment: createAttachmentResolver(),
-  });
+  const discoveryTurn = await continueDiscoveryConversation(
+    llmMini,
+    session.history,
+    project?.discoveryReadiness,
+    createAttachmentResolver()
+  );
+  const reply = discoveryTurn.reply;
 
   // Add assistant reply
   session.history.push({ role: "assistant", content: reply });
 
   // Update session
   await updateChatSessionHistory(session.id, session.history);
+  await prisma.project.update({
+    where: { id: projectId },
+    data: {
+      discoveryReadiness: sanitizeForPrisma(discoveryTurn.readiness) as any,
+    },
+  });
 
   res.json({ reply });
 }));

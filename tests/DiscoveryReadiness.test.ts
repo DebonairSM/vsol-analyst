@@ -173,6 +173,7 @@ test("projects without discovery readiness load with a safe default", () => {
     sections: [],
     assumptions: [],
     openQuestions: [],
+    clarificationItems: [],
   });
 });
 

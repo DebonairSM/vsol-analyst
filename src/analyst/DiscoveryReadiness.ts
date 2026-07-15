@@ -16,6 +16,19 @@ export interface DiscoveryReadinessSection {
   openQuestions: string[];
 }
 
+export type DiscoveryClarificationStatus = "asking" | "parked" | "resolved";
+
+export interface DiscoveryClarificationItem {
+  key: string;
+  question: string;
+  knownContext: string[];
+  followUps: string[];
+  attempts: number;
+  status: DiscoveryClarificationStatus;
+  resolution?: string;
+  openQuestion?: string;
+}
+
 export interface DiscoveryReadiness {
   version: typeof DISCOVERY_READINESS_VERSION;
   status: DiscoveryReadinessStatus;
@@ -24,6 +37,7 @@ export interface DiscoveryReadiness {
   sections: DiscoveryReadinessSection[];
   assumptions: string[];
   openQuestions: string[];
+  clarificationItems: DiscoveryClarificationItem[];
 }
 
 export interface DiscoveryReadinessSectionPatch {
@@ -42,6 +56,7 @@ export interface DiscoveryReadinessPatch {
   sections?: DiscoveryReadinessSectionPatch[];
   assumptions?: string[];
   openQuestions?: string[];
+  clarificationItems?: DiscoveryClarificationItem[];
 }
 
 export interface DiscoveryReadinessArea {
@@ -71,6 +86,7 @@ export function createEmptyDiscoveryReadiness(): DiscoveryReadiness {
     sections: [],
     assumptions: [],
     openQuestions: [],
+    clarificationItems: [],
   };
 }
 
@@ -96,6 +112,9 @@ export function normalizeDiscoveryReadiness(
       : [],
     assumptions: normalizeStringArray(candidate.assumptions),
     openQuestions: normalizeStringArray(candidate.openQuestions),
+    clarificationItems: normalizeClarificationItems(
+      candidate.clarificationItems
+    ),
   };
 }
 
@@ -137,6 +156,10 @@ export function mergeDiscoveryReadiness(
       patch.openQuestions === undefined
         ? current.openQuestions
         : normalizeStringArray(patch.openQuestions),
+    clarificationItems:
+      patch.clarificationItems === undefined
+        ? current.clarificationItems
+        : normalizeClarificationItems(patch.clarificationItems),
   };
 }
 
@@ -302,6 +325,50 @@ function normalizeSection(
     assumptions: normalizeStringArray(value.assumptions),
     openQuestions: normalizeStringArray(value.openQuestions),
   };
+}
+
+function normalizeClarificationItems(
+  value: unknown
+): DiscoveryClarificationItem[] {
+  if (!Array.isArray(value)) return [];
+
+  const items = new Map<string, DiscoveryClarificationItem>();
+  for (const candidate of value) {
+    if (
+      !candidate ||
+      typeof candidate !== "object" ||
+      Array.isArray(candidate)
+    ) {
+      continue;
+    }
+
+    const raw = candidate as Partial<DiscoveryClarificationItem>;
+    const key = typeof raw.key === "string" ? raw.key.trim() : "";
+    const question = typeof raw.question === "string" ? raw.question.trim() : "";
+    if (!key || !question || items.has(key.toLocaleLowerCase())) continue;
+
+    const status: DiscoveryClarificationStatus =
+      raw.status === "parked" || raw.status === "resolved"
+        ? raw.status
+        : "asking";
+    const resolution =
+      typeof raw.resolution === "string" ? raw.resolution.trim() : "";
+    const openQuestion =
+      typeof raw.openQuestion === "string" ? raw.openQuestion.trim() : "";
+
+    items.set(key.toLocaleLowerCase(), {
+      key,
+      question,
+      knownContext: normalizeStringArray(raw.knownContext),
+      followUps: normalizeStringArray(raw.followUps),
+      attempts: normalizeAttempts(raw.attempts, 0),
+      status,
+      ...(resolution ? { resolution } : {}),
+      ...(openQuestion ? { openQuestion } : {}),
+    });
+  }
+
+  return [...items.values()];
 }
 
 function toReadinessArea(
