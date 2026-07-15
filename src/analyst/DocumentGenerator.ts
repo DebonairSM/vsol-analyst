@@ -61,7 +61,36 @@ export class DocumentGenerator {
   generateRequirementsMarkdown(req: RequirementsSummary): string {
     const lines: string[] = [];
 
-    lines.push(`# System Requirements`);
+    lines.push(`# Requirements for Business Review`);
+    lines.push("");
+
+    // Put a concise, client-readable overview and review status before detail.
+    lines.push(`## Client Summary`);
+    lines.push(this.clientSummary(req));
+    lines.push("");
+
+    lines.push(`## Confirmed Facts`);
+    if (req.confirmedFacts?.length) {
+      for (const fact of req.confirmedFacts) lines.push(`- ${fact}`);
+    } else {
+      lines.push("No confirmed facts have been recorded yet.");
+    }
+    lines.push("");
+
+    lines.push(`## Assumptions`);
+    if (req.assumptions?.length) {
+      for (const assumption of req.assumptions) lines.push(`- ${assumption}`);
+    } else {
+      lines.push("No assumptions have been recorded.");
+    }
+    lines.push("");
+
+    lines.push(`## Open Questions`);
+    if (req.openQuestions?.length) {
+      for (const question of req.openQuestions) lines.push(`- ${question}`);
+    } else {
+      lines.push("No open questions have been recorded.");
+    }
     lines.push("");
     
     // Business Context
@@ -175,7 +204,7 @@ export class DocumentGenerator {
 
     // Data Entities - CRITICAL for spreadsheet data
     if (req.dataEntities?.length) {
-      lines.push(`## Data Entities and Structure`);
+      lines.push(`## Information the Business Needs`);
       for (const entity of req.dataEntities) {
         lines.push(`### ${entity.name}`);
         if (entity.fields?.length) {
@@ -189,7 +218,7 @@ export class DocumentGenerator {
 
     // Candidate Modules
     if (req.candidateModules?.length) {
-      lines.push(`## Candidate Modules`);
+      lines.push(`## Proposed Capabilities`);
       for (const m of req.candidateModules) {
         const priority = m.priority ?? "unspecified";
         const desc = m.description ?? "Description not yet defined.";
@@ -202,7 +231,7 @@ export class DocumentGenerator {
 
     // Non Functional Needs
     if (req.nonFunctionalNeeds?.length) {
-      lines.push(`## Non Functional Needs`);
+      lines.push(`## Quality, Access, and Operating Needs`);
       for (const n of req.nonFunctionalNeeds) lines.push(`- ${n}`);
       lines.push("");
     }
@@ -216,26 +245,33 @@ export class DocumentGenerator {
       lines.push("");
     }
 
-    // Keep these review sections visible even when discovery has not captured
-    // an item yet; an empty field should not disappear from an approval copy.
-    lines.push(`## Assumptions`);
-    if (req.assumptions?.length) {
-      for (const assumption of req.assumptions) lines.push(`- ${assumption}`);
-    } else {
-      lines.push("No assumptions have been recorded.");
-    }
-    lines.push("");
-
-    // Open Questions
-    lines.push(`## Open Questions`);
-    if (req.openQuestions?.length) {
-      for (const q of req.openQuestions) lines.push(`- ${q}`);
-    } else {
-      lines.push("No open questions have been recorded.");
-    }
-    lines.push("");
-
     return lines.join("\n");
+  }
+
+  private clientSummary(req: RequirementsSummary): string {
+    const supplied = req.clientSummary?.trim();
+    if (supplied) return supplied;
+
+    const sentences: string[] = [];
+    const goal = req.primaryGoal?.trim();
+    if (goal) sentences.push(goal.endsWith(".") ? goal : `${goal}.`);
+
+    const mustHaveNames = (req.candidateModules ?? [])
+      .filter((module) => module.priority === "must-have")
+      .map((module) => module.name.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    if (mustHaveNames.length) {
+      sentences.push(`The proposed first scope centers on ${this.joinBusinessList(mustHaveNames)}.`);
+    }
+
+    return sentences.join(" ") || "A client summary has not been recorded yet.";
+  }
+
+  private joinBusinessList(values: string[]): string {
+    if (values.length < 2) return values[0] ?? "";
+    if (values.length === 2) return `${values[0]} and ${values[1]}`;
+    return `${values.slice(0, -1).join(", ")}, and ${values[values.length - 1]}`;
   }
 
   // ===== Text Processing Helpers =====

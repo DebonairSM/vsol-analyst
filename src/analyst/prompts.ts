@@ -75,6 +75,8 @@ Given the transcript, you must:
 
 1. Extract a RequirementsSummary with these fields:
    - businessContext
+   - clientSummary
+   - confirmedFacts
    - primaryGoal
    - secondaryGoals
    - uploadedDocuments
@@ -158,6 +160,8 @@ interface BusinessTerm {
 
 interface RequirementsSummary {
   businessContext: BusinessContext;
+  clientSummary: string;
+  confirmedFacts: string[];
   primaryGoal: string;
   secondaryGoals: string[];
   currentTools: string[];
@@ -313,6 +317,8 @@ The \`workflowDiagram\` string should include:
 
 ### 6. Other Required Fields
 
+- **clientSummary**: Two to four concise sentences for the client to review first. State the business outcome, current problem, and proposed scope in plain language. Use the client's confirmed preferred terms.
+- **confirmedFacts**: Statements explicitly supported by the client's words or supplied files. Do not put an inference, recommendation, or unresolved detail here.
 - **primaryGoal**: One sentence summarizing the main business objective
 - **secondaryGoals**: Array of additional goals
 - **painPoints**: Current problems with description, impact, and frequency
@@ -326,6 +332,12 @@ The \`workflowDiagram\` string should include:
 ---
 
 ### Rules - CRITICAL FOR THOROUGHNESS:
+
+0. WRITE FOR CLIENT REVIEW FIRST:
+   - Use plain business language and the client's own confirmed terms.
+   - Technical details are included only where they help clarify scope or constraints; avoid internal engineering jargon, implementation patterns, and speculative technology choices.
+   - Never blur evidence and uncertainty: confirmedFacts contains only explicit evidence, assumptions contains unconfirmed working beliefs, and openQuestions contains unresolved decisions.
+   - Make clientSummary useful on its own before the reader reaches detailed sections.
 
 1. EXTRACT EVERYTHING - Be exhaustively comprehensive:
    - Every feature mentioned, even in passing
@@ -643,6 +655,8 @@ Your job is to fix issues in the RequirementsSummary, particularly the workflowD
 - Do NOT invent new actors, modules, or tools that are not present in the existing RequirementsSummary.
 - Do NOT change the overall structure or invent new actors/modules
 - Preserve assumptions and openQuestions, including unresolved discovery-readiness items.
+- Preserve clientSummary and confirmedFacts unless the transcript clearly shows they are inaccurate.
+- Keep clientSummary in plain business language and keep technical details only when they clarify scope or constraints.
 - Preserve ubiquitousLanguage entries, sources, aliases, confirmation states, and clarification questions.
 - Use confirmed preferredTerm values consistently in candidateModules and workflowDiagram labels; replace any alias drift with the preferred term.
 - Keep all changes faithful to the transcript
