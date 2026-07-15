@@ -213,3 +213,13 @@ test("clarification control explicitly includes ubiquitous-language gaps", () =>
   assert.match(instructions, /ubiquitous-language clarification questions/i);
   assert.match(instructions, /term:<normalized-term>/i);
 });
+
+test("conversation guidance follows the selected discovery mode", () => {
+  const instructions = formatDiscoveryConversationInstructions({
+    mode: "integration_heavy",
+  });
+
+  assert.match(instructions, /Integration Heavy/);
+  assert.match(instructions, /data_contracts/);
+  assert.match(instructions, /authentication/i);
+});
