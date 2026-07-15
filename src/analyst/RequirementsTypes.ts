@@ -87,6 +87,10 @@ export interface BusinessTerm {
 
 export interface RequirementsSummary {
   businessContext: BusinessContext;
+  /** A short business-review overview written in the client's language. */
+  clientSummary?: string;
+  /** Statements explicitly supported by the client or their supplied material. */
+  confirmedFacts?: string[];
   primaryGoal: string;
   secondaryGoals: string[];
   currentTools: string[];
