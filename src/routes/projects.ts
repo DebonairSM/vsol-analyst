@@ -15,6 +15,11 @@ import {
   normalizeDiscoveryReadiness,
   setDiscoveryMode,
 } from "../analyst/DiscoveryReadiness";
+import {
+  applyOrganizationContextDecisions,
+  createPendingOrganizationContext,
+  type OrganizationContextDecision,
+} from "../analyst/OrganizationPreferences";
 
 const router = Router();
 
@@ -57,11 +62,16 @@ router.post("/", requireAuth, asyncHandler(async (req, res) => {
     throw new NotFoundError("Company");
   }
 
+  const discoveryReadiness = createEmptyDiscoveryReadiness();
+  discoveryReadiness.organizationContext = createPendingOrganizationContext(
+    company.discoveryPreferences
+  );
+
   const project = await prisma.project.create({
     data: {
       name: projectName,
       companyId: company.id,
-      discoveryReadiness: createEmptyDiscoveryReadiness() as any,
+      discoveryReadiness: discoveryReadiness as any,
     },
   });
 
@@ -241,6 +251,73 @@ router.patch("/:id/discovery-mode", requireAuth, asyncHandler(async (req, res) =
     readiness,
     profile: getDiscoveryModeProfile(mode),
     readinessWarning: assessDiscoveryReadiness(readiness),
+  });
+}));
+
+router.get("/:id/organization-context", requireAuth, asyncHandler(async (req, res) => {
+  const user = getAuthenticatedUser(req.user);
+  const { id } = req.params;
+  validateUUID(id);
+  const project = await prisma.project.findFirst({
+    where: { id, company: { userId: user.id } },
+    select: { discoveryReadiness: true },
+  });
+  if (!project) throw new NotFoundError("Project");
+
+  const readiness = normalizeDiscoveryReadiness(project.discoveryReadiness);
+  res.json({
+    context: readiness.organizationContext,
+    pendingCount: readiness.organizationContext.filter(
+      (item) => item.status === "pending_confirmation"
+    ).length,
+  });
+}));
+
+router.patch("/:id/organization-context", requireAuth, asyncHandler(async (req, res) => {
+  const user = getAuthenticatedUser(req.user);
+  const { id } = req.params;
+  validateUUID(id);
+  const decisions = req.body?.decisions;
+  if (!Array.isArray(decisions) || decisions.length === 0) {
+    throw new ValidationError("decisions must be a non-empty array");
+  }
+  const normalizedDecisions: OrganizationContextDecision[] = decisions.map(
+    (decision: unknown) => {
+      if (!decision || typeof decision !== "object" || Array.isArray(decision)) {
+        throw new ValidationError("Each decision must be an object");
+      }
+      const raw = decision as Record<string, unknown>;
+      if (
+        typeof raw.id !== "string" ||
+        (raw.action !== "accept" && raw.action !== "dismiss")
+      ) {
+        throw new ValidationError("Each decision requires an id and accept or dismiss action");
+      }
+      return { id: raw.id, action: raw.action };
+    }
+  );
+
+  const project = await prisma.project.findFirst({
+    where: { id, company: { userId: user.id } },
+    select: { discoveryReadiness: true },
+  });
+  if (!project) throw new NotFoundError("Project");
+
+  const readiness = normalizeDiscoveryReadiness(project.discoveryReadiness);
+  const updated = applyOrganizationContextDecisions(
+    readiness.organizationContext,
+    readiness.assumptions,
+    normalizedDecisions
+  );
+  readiness.organizationContext = updated.organizationContext;
+  readiness.assumptions = updated.assumptions;
+  await prisma.project.update({
+    where: { id },
+    data: { discoveryReadiness: readiness as any },
+  });
+  res.json({
+    context: readiness.organizationContext,
+    assumptions: readiness.assumptions,
   });
 }));
 

@@ -1,3 +1,8 @@
+import {
+  normalizeOrganizationContext,
+  type OrganizationContextItem,
+} from "./OrganizationPreferences";
+
 export const DISCOVERY_READINESS_VERSION = 1 as const;
 export const DEFAULT_DISCOVERY_READINESS_THRESHOLD = 0.7;
 
@@ -134,6 +139,7 @@ export interface DiscoveryReadiness {
   assumptions: string[];
   openQuestions: string[];
   clarificationItems: DiscoveryClarificationItem[];
+  organizationContext: OrganizationContextItem[];
 }
 
 export interface DiscoveryReadinessSectionPatch {
@@ -154,6 +160,7 @@ export interface DiscoveryReadinessPatch {
   assumptions?: string[];
   openQuestions?: string[];
   clarificationItems?: DiscoveryClarificationItem[];
+  organizationContext?: OrganizationContextItem[];
 }
 
 export interface DiscoveryReadinessArea {
@@ -204,6 +211,7 @@ export function createEmptyDiscoveryReadiness(
     assumptions: [],
     openQuestions: [],
     clarificationItems: [],
+    organizationContext: [],
   };
 }
 
@@ -234,6 +242,9 @@ export function normalizeDiscoveryReadiness(
     openQuestions: normalizeStringArray(candidate.openQuestions),
     clarificationItems: normalizeClarificationItems(
       candidate.clarificationItems
+    ),
+    organizationContext: normalizeOrganizationContext(
+      candidate.organizationContext
     ),
   };
 }
@@ -284,6 +295,10 @@ export function mergeDiscoveryReadiness(
       patch.clarificationItems === undefined
         ? current.clarificationItems
         : normalizeClarificationItems(patch.clarificationItems),
+    organizationContext:
+      patch.organizationContext === undefined
+        ? current.organizationContext
+        : normalizeOrganizationContext(patch.organizationContext),
   };
 }
 
@@ -310,6 +325,11 @@ export function formatDiscoveryReadinessContext(value: unknown): string {
     ...EXPENSIVE_MISS_CHECKS.map(
       (check) => `- ${check.label}: ${check.question}`
     ),
+    "Remembered organization context:",
+    readiness.organizationContext.length
+      ? JSON.stringify(readiness.organizationContext, null, 2)
+      : "No remembered organization context is attached to this project.",
+    "Never treat pending remembered context as a project fact. Ask for confirmation first. Accepted items remain project assumptions unless the user explicitly confirms them as facts; dismissed items must be ignored.",
     "Use this as supporting context. Explicit user statements and user-corrected requirements are authoritative; do not replace them with readiness assumptions. Keep unresolved readiness questions visible in the extracted requirements where relevant.",
   ].join("\n");
 }
