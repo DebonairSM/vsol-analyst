@@ -1,6 +1,7 @@
 import {
   type DiscoveryClarificationItem,
   type DiscoveryReadiness,
+  EXPENSIVE_MISS_CHECKS,
   getDiscoveryModeProfile,
   normalizeDiscoveryReadiness,
   withDiscoveryReadinessContext,
@@ -187,6 +188,10 @@ export function formatDiscoveryConversationInstructions(
     `Selected discovery mode: ${profile.label}. ${profile.description}`,
     `Emphasize this checklist: ${profile.focusAreas.join(", ")}.`,
     `Mode-specific question style: ${profile.questionStyle}`,
+    "Check these expensive-miss categories during discovery; ask one targeted question at a time when its answer is not already known:",
+    ...EXPENSIVE_MISS_CHECKS.map(
+      (check) => `- ${check.label}: ${check.question}`
+    ),
     "Return one JSON object with a client-facing `reply` string and one `discoveryAction`.",
     "The action is {type:'ask', itemKey, question, knownContext}, {type:'park', itemKey, knownContext}, {type:'resolve', itemKey, answer}, or {type:'none'}.",
     "Use one stable itemKey for the same unresolved point. Every ask must use a genuinely different concrete phrasing.",

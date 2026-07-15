@@ -77,6 +77,7 @@ Given the transcript, you must:
    - businessContext
    - clientSummary
    - confirmedFacts
+   - expensiveMisses
    - primaryGoal
    - secondaryGoals
    - uploadedDocuments
@@ -162,6 +163,12 @@ interface RequirementsSummary {
   businessContext: BusinessContext;
   clientSummary: string;
   confirmedFacts: string[];
+  expensiveMisses: {
+    category: string;
+    label: string;
+    question: string;
+    status: "missing" | "low_confidence";
+  }[];
   primaryGoal: string;
   secondaryGoals: string[];
   currentTools: string[];
@@ -319,6 +326,7 @@ The \`workflowDiagram\` string should include:
 
 - **clientSummary**: Two to four concise sentences for the client to review first. State the business outcome, current problem, and proposed scope in plain language. Use the client's confirmed preferred terms.
 - **confirmedFacts**: Statements explicitly supported by the client's words or supplied files. Do not put an inference, recommendation, or unresolved detail here.
+- **expensiveMisses**: Unresolved permissions, approval, integration, spreadsheet-ownership, and reporting/export categories. Include the category, client-friendly label, focused question, and whether it is missing or low confidence.
 - **primaryGoal**: One sentence summarizing the main business objective
 - **secondaryGoals**: Array of additional goals
 - **painPoints**: Current problems with description, impact, and frequency
@@ -338,6 +346,7 @@ The \`workflowDiagram\` string should include:
    - Technical details are included only where they help clarify scope or constraints; avoid internal engineering jargon, implementation patterns, and speculative technology choices.
    - Never blur evidence and uncertainty: confirmedFacts contains only explicit evidence, assumptions contains unconfirmed working beliefs, and openQuestions contains unresolved decisions.
    - Make clientSummary useful on its own before the reader reaches detailed sections.
+   - Explicitly check permissions, approval flows, hidden integrations, spreadsheet ownership, and reporting/export expectations. Missing categories must remain in expensiveMisses and openQuestions; never silently assume them.
 
 1. EXTRACT EVERYTHING - Be exhaustively comprehensive:
    - Every feature mentioned, even in passing

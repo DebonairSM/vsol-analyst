@@ -5,6 +5,7 @@ import { SYSTEM_PROMPT_REFINER } from "./prompts";
 import { RequirementsSummary } from "./RequirementsTypes";
 import {
   includeIncompleteDiscoveryContext,
+  includeExpensiveMissContext,
   normalizeDiscoveryReadiness,
 } from "./DiscoveryReadiness";
 import { includeUbiquitousLanguageContext } from "./UbiquitousLanguage";
@@ -330,6 +331,7 @@ export class RequirementsRefinementPipeline {
       finalSummary,
       discoveryReadiness
     );
+    finalSummary = includeExpensiveMissContext(finalSummary, discoveryReadiness);
     finalSummary = includeUbiquitousLanguageContext(finalSummary);
 
     // 4) Generate final documents

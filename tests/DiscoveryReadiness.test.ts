@@ -6,6 +6,7 @@ import { ChatMessage, LLMProvider } from "../src/llm/LLMProvider";
 import {
   assessDiscoveryReadiness,
   buildDiscoveryReadinessPersistenceData,
+  EXPENSIVE_MISS_CHECKS,
   getDiscoveryModeProfile,
   getDiscoveryReadinessThreshold,
   includeIncompleteDiscoveryContext,
@@ -14,6 +15,14 @@ import {
   setDiscoveryMode,
   withDiscoveryReadinessContext,
 } from "../src/analyst/DiscoveryReadiness";
+
+function readyExpensiveSections(confidence = 0.9) {
+  return EXPENSIVE_MISS_CHECKS.map((check) => ({
+    key: check.key,
+    status: "ready" as const,
+    confidence,
+  }));
+}
 
 test("readiness threshold is configurable with a safe default", () => {
   assert.equal(getDiscoveryReadinessThreshold(""), 0.7);
@@ -48,18 +57,23 @@ test("thin discovery warning identifies missing and low-confidence areas", () =>
 
   assert.equal(warning.shouldWarn, true);
   assert.equal(warning.isBelowThreshold, true);
-  assert.deepEqual(
-    warning.missingAreas.map((area) => area.key),
-    ["business_context"]
-  );
+  const missingKeys = warning.missingAreas.map((area) => area.key);
+  assert.ok(missingKeys.includes("business_context"));
+  assert.ok(missingKeys.includes("permissions_and_access"));
+  assert.ok(missingKeys.includes("hidden_integrations"));
+  assert.ok(missingKeys.includes("spreadsheet_ownership"));
+  assert.ok(missingKeys.includes("reporting_and_exports"));
   assert.deepEqual(
     warning.lowConfidenceAreas.map((area) => area.key),
     ["approval_workflow"]
   );
-  assert.deepEqual(warning.openQuestions, [
-    "Who owns the final approval?",
-    "Is a second approval required?",
-  ]);
+  assert.ok(warning.openQuestions.includes("Who owns the final approval?"));
+  assert.ok(warning.openQuestions.includes("Is a second approval required?"));
+  assert.ok(
+    warning.openQuestions.some((question) =>
+      question.includes("Which roles may view")
+    )
+  );
 });
 
 test("completed discovery does not show a warning", () => {
@@ -73,6 +87,7 @@ test("completed discovery does not show a warning", () => {
           status: "ready",
           confidence: 0.9,
         },
+        ...readyExpensiveSections(),
       ],
     },
     0.7
@@ -87,7 +102,10 @@ test("configured threshold controls whether the warning is shown", () => {
   const readiness = {
     status: "in_progress",
     confidence: 0.8,
-    sections: [],
+    sections: [
+      { key: "business_context", status: "ready", confidence: 0.8 },
+      ...readyExpensiveSections(0.8),
+    ],
   };
 
   assert.equal(assessDiscoveryReadiness(readiness, 0.7).shouldWarn, false);
@@ -128,10 +146,15 @@ test("incomplete discovery assumptions and questions are visible in requirements
     "Requests arrive by email",
     "Managers approve exceptions",
   ]);
-  assert.deepEqual(requirements.openQuestions, [
-    "What is the target turnaround time?",
-    "Who owns the final approval?",
-  ]);
+  assert.ok(
+    requirements.openQuestions.includes("What is the target turnaround time?")
+  );
+  assert.ok(requirements.openQuestions.includes("Who owns the final approval?"));
+  assert.ok(
+    requirements.openQuestions.some((question) =>
+      question.includes("Which roles may view")
+    )
+  );
   assert.match(markdown, /## Assumptions/);
   assert.match(markdown, /Managers approve exceptions/);
   assert.match(markdown, /## Open Questions/);
@@ -155,7 +178,14 @@ test("requirements keep assumption and question review sections visible when emp
       uploadedDocuments: [],
       workflowDiagram: "flowchart TD",
     },
-    { status: "not_started", confidence: 0 },
+    {
+      status: "ready",
+      confidence: 0.9,
+      sections: [
+        { key: "business_context", status: "ready", confidence: 0.9 },
+        ...readyExpensiveSections(),
+      ],
+    },
     0.7
   );
   const markdown = new DocumentGenerator().generateRequirementsMarkdown(
@@ -173,7 +203,20 @@ test("projects without discovery readiness load with a safe default", () => {
     status: "not_started",
     confidence: 0,
     attempts: 0,
-    sections: [],
+    sections: [
+      "permissions_and_access",
+      "approval_workflow",
+      "hidden_integrations",
+      "spreadsheet_ownership",
+      "reporting_and_exports",
+    ].map((key) => ({
+      key,
+      status: "not_started",
+      confidence: 0,
+      attempts: 0,
+      assumptions: [],
+      openQuestions: [],
+    })),
     assumptions: [],
     openQuestions: [],
     clarificationItems: [],
@@ -213,7 +256,10 @@ test("selected mode changes readiness emphasis and scoring", () => {
   const base = {
     status: "ready",
     confidence: 0.9,
-    sections: [{ key: "business_context", status: "ready", confidence: 0.9 }],
+    sections: [
+      { key: "business_context", status: "ready", confidence: 0.9 },
+      ...readyExpensiveSections(),
+    ],
   };
   const quick = assessDiscoveryReadiness({ ...base, mode: "quick_scope" }, 0.7);
   const integration = assessDiscoveryReadiness(
@@ -301,10 +347,12 @@ test("section patches normalize keys before merging", () => {
     }
   );
 
-  assert.equal(updated.sections.length, 1);
-  assert.equal(updated.sections[0].key, "business_context");
-  assert.equal(updated.sections[0].status, "ready");
-  assert.equal(updated.sections[0].attempts, 1);
+  const businessSections = updated.sections.filter(
+    (section) => section.key === "business_context"
+  );
+  assert.equal(businessSections.length, 1);
+  assert.equal(businessSections[0].status, "ready");
+  assert.equal(businessSections[0].attempts, 1);
 });
 
 test("chat readiness context is ephemeral and follows the identity prompt", () => {

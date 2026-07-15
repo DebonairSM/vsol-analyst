@@ -57,6 +57,45 @@ const DISCOVERY_MODE_PROFILES: Record<DiscoveryMode, DiscoveryModeProfile> = {
   },
 };
 
+export interface ExpensiveMissCheck {
+  key: string;
+  label: string;
+  question: string;
+}
+
+export const EXPENSIVE_MISS_CHECKS: ExpensiveMissCheck[] = [
+  {
+    key: "permissions_and_access",
+    label: "Permissions and access",
+    question:
+      "Which roles may view, create, change, approve, export, or delete each kind of information?",
+  },
+  {
+    key: "approval_workflow",
+    label: "Approval workflow",
+    question:
+      "What triggers approval, who approves each case or threshold, and what happens after a delay, decline, or delegation?",
+  },
+  {
+    key: "hidden_integrations",
+    label: "Hidden integrations",
+    question:
+      "Which other systems exchange data here, in which direction, how are they accessed, who owns them, and what happens when they fail?",
+  },
+  {
+    key: "spreadsheet_ownership",
+    label: "Spreadsheet ownership",
+    question:
+      "Which spreadsheets are sources of truth, who owns their columns and formulas, and how should duplicates, blanks, and migration be handled?",
+  },
+  {
+    key: "reporting_and_exports",
+    label: "Reporting and exports",
+    question:
+      "Who needs each report or export, with which measures, filters, format, schedule, and delivery method?",
+  },
+];
+
 export type DiscoveryReadinessStatus =
   | "not_started"
   | "in_progress"
@@ -134,6 +173,13 @@ export interface DiscoveryReadinessAssessment {
   status: DiscoveryReadinessStatus;
   missingAreas: DiscoveryReadinessArea[];
   lowConfidenceAreas: DiscoveryReadinessArea[];
+  expensiveMisses: Array<{
+    key: string;
+    label: string;
+    question: string;
+    status: "missing" | "low_confidence";
+    confidence: number;
+  }>;
   assumptions: string[];
   openQuestions: string[];
 }
@@ -147,7 +193,14 @@ export function createEmptyDiscoveryReadiness(
     status: "not_started",
     confidence: 0,
     attempts: 0,
-    sections: [],
+    sections: EXPENSIVE_MISS_CHECKS.map((check) => ({
+      key: check.key,
+      status: "not_started",
+      confidence: 0,
+      attempts: 0,
+      assumptions: [],
+      openQuestions: [],
+    })),
     assumptions: [],
     openQuestions: [],
     clarificationItems: [],
@@ -170,11 +223,13 @@ export function normalizeDiscoveryReadiness(
     status: normalizeStatus(candidate.status, empty.status),
     confidence: normalizeConfidence(candidate.confidence, empty.confidence),
     attempts: normalizeAttempts(candidate.attempts, empty.attempts),
-    sections: Array.isArray(candidate.sections)
-      ? candidate.sections
-          .filter(isRecordWithKey)
-          .map((section) => normalizeSection(section))
-      : [],
+    sections: ensureExpensiveMissSections(
+      Array.isArray(candidate.sections)
+        ? candidate.sections
+            .filter(isRecordWithKey)
+            .map((section) => normalizeSection(section))
+        : []
+    ),
     assumptions: normalizeStringArray(candidate.assumptions),
     openQuestions: normalizeStringArray(candidate.openQuestions),
     clarificationItems: normalizeClarificationItems(
@@ -251,6 +306,10 @@ export function formatDiscoveryReadinessContext(value: unknown): string {
     `Selected discovery mode: ${profile.label}. ${profile.description}`,
     `Mode focus checklist: ${profile.focusAreas.join(", ")}.`,
     `Question style: ${profile.questionStyle}`,
+    "Expensive-miss checklist (unresolved categories must remain visible):",
+    ...EXPENSIVE_MISS_CHECKS.map(
+      (check) => `- ${check.label}: ${check.question}`
+    ),
     "Use this as supporting context. Explicit user statements and user-corrected requirements are authoritative; do not replace them with readiness assumptions. Keep unresolved readiness questions visible in the extracted requirements where relevant.",
   ].join("\n");
 }
@@ -305,16 +364,59 @@ export function assessDiscoveryReadiness(
     ? coveredFocusAreas.reduce((sum, section) => sum + section.confidence, 0) /
       coveredFocusAreas.length
     : readiness.confidence;
-  const adjustedConfidence = coveredFocusAreas.length
+  const modeAdjustedConfidence = coveredFocusAreas.length
     ? readiness.confidence * 0.4 + focusConfidence * 0.6
     : readiness.confidence;
+  const expensiveChecksActive = EXPENSIVE_MISS_CHECKS.some((check) =>
+    sectionsByKey.has(check.key.toLocaleLowerCase())
+  );
+  const expensiveMisses = expensiveChecksActive
+    ? EXPENSIVE_MISS_CHECKS.flatMap((check) => {
+        const section = sectionsByKey.get(check.key.toLocaleLowerCase());
+        if (!section) {
+          if (!missingAreas.some((area) => area.key === check.key)) {
+            missingAreas.push({
+              key: check.key,
+              status: "not_started",
+              confidence: 0,
+            });
+          }
+          return [{ ...check, status: "missing" as const, confidence: 0 }];
+        }
+        if (section.status === "ready" && section.confidence >= safeThreshold) {
+          return [];
+        }
+        return [
+          {
+            ...check,
+            status:
+              section.status === "not_started"
+                ? ("missing" as const)
+                : ("low_confidence" as const),
+            confidence: section.confidence,
+          },
+        ];
+      })
+    : [];
+  const expensiveConfidence = expensiveChecksActive
+    ? EXPENSIVE_MISS_CHECKS.reduce(
+        (sum, check) =>
+          sum +
+          (sectionsByKey.get(check.key.toLocaleLowerCase())?.confidence ?? 0),
+        0
+      ) / EXPENSIVE_MISS_CHECKS.length
+    : modeAdjustedConfidence;
+  const adjustedConfidence = expensiveChecksActive
+    ? modeAdjustedConfidence * 0.6 + expensiveConfidence * 0.4
+    : modeAdjustedConfidence;
   const isBelowThreshold = adjustedConfidence < safeThreshold;
   const hasMissingFocusAreas =
     (readiness.mode !== "quick_scope" || readiness.sections.length > 0) &&
     profile.focusAreas.some(
       (key) => !sectionsByKey.has(key.toLocaleLowerCase())
     );
-  const shouldWarn = isBelowThreshold || hasMissingFocusAreas;
+  const shouldWarn =
+    isBelowThreshold || hasMissingFocusAreas || expensiveMisses.length > 0;
 
   // A newly created or sparsely populated readiness record has no named
   // sections. Keep the warning useful by exposing the overall discovery area.
@@ -348,13 +450,15 @@ export function assessDiscoveryReadiness(
     status: readiness.status,
     missingAreas,
     lowConfidenceAreas,
+    expensiveMisses,
     assumptions: mergeUniqueStrings(
       readiness.assumptions,
       ...incompleteSections.map((section) => section.assumptions)
     ),
     openQuestions: mergeUniqueStrings(
       readiness.openQuestions,
-      ...incompleteSections.map((section) => section.openQuestions)
+      ...incompleteSections.map((section) => section.openQuestions),
+      expensiveMisses.map((finding) => finding.question)
     ),
   };
 }
@@ -407,6 +511,47 @@ export function includeIncompleteDiscoveryContext<
   };
 }
 
+export function includeExpensiveMissContext<
+  T extends {
+    openQuestions?: string[];
+    expensiveMisses?: Array<{
+      category: string;
+      label: string;
+      question: string;
+      status: "missing" | "low_confidence";
+    }>;
+  }
+>(
+  requirements: T,
+  readinessValue: unknown,
+  threshold = getDiscoveryReadinessThreshold()
+): T & {
+  openQuestions: string[];
+  expensiveMisses: Array<{
+    category: string;
+    label: string;
+    question: string;
+    status: "missing" | "low_confidence";
+  }>;
+} {
+  const assessment = assessDiscoveryReadiness(readinessValue, threshold);
+  const expensiveMisses = assessment.expensiveMisses.map((finding) => ({
+    category: finding.key,
+    label: finding.label,
+    question: finding.question,
+    status: finding.status,
+  }));
+
+  return {
+    ...requirements,
+    openQuestions: mergeUniqueStrings(
+      requirements.openQuestions,
+      expensiveMisses.map((finding) => finding.question)
+    ),
+    expensiveMisses,
+  };
+}
+
 export function withDiscoveryReadinessContext<T extends { role: string; content: unknown }>(
   messages: T[],
   value: unknown
@@ -438,6 +583,30 @@ function isRecordWithKey(value: unknown): value is Record<string, unknown> & { k
       typeof (value as { key?: unknown }).key === "string" &&
       (value as { key: string }).key.trim()
   );
+}
+
+function ensureExpensiveMissSections(
+  sections: DiscoveryReadinessSection[]
+): DiscoveryReadinessSection[] {
+  const result = [...sections];
+  const keys = new Set(
+    result.map((section) => section.key.trim().toLocaleLowerCase())
+  );
+
+  for (const check of EXPENSIVE_MISS_CHECKS) {
+    if (!keys.has(check.key.toLocaleLowerCase())) {
+      result.push({
+        key: check.key,
+        status: "not_started",
+        confidence: 0,
+        attempts: 0,
+        assumptions: [],
+        openQuestions: [],
+      });
+    }
+  }
+
+  return result;
 }
 
 function normalizeSection(
