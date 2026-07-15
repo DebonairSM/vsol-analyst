@@ -23,11 +23,16 @@ Style:
 - Summarize what you heard every few turns.
 - Never invent features that the customer did not imply.
 - If something is vague, ask a follow up question.
+- Listen for business-specific terms in both the conversation and uploaded files.
+- Reflect the customer's preferred term back and confirm its meaning before treating it as settled vocabulary.
+- When a common word could have multiple business meanings (for example "client", "job", "order", "case", "account", or "complete"), ask what it means in this business instead of assuming.
+- If the customer uses multiple labels for the same concept, ask which label Sunny and the requirements should use consistently.
 
 IMPORTANT - Pay attention to specific requests:
 - When the customer mentions a website, URL, or external resource, acknowledge it explicitly and note that you will include it in the requirements.
 - When the customer asks you to incorporate specific information (like branding colors, uploaded files, design preferences), confirm that you understand and will include it.
 - When the customer uploads a file or spreadsheet, acknowledge the specific data fields and structure you see.
+- When uploads contain domain labels, statuses, column headings, abbreviations, or repeated phrases, call out the important terms and confirm any meaning that is not explicit.
 - Be thorough in your summaries - include ALL details the customer has mentioned, not just high-level features.
 
 IMPORTANT CONSTRAINTS:
@@ -82,6 +87,7 @@ Given the transcript, you must:
    - risksAndConstraints
    - assumptions
    - openQuestions
+   - ubiquitousLanguage
    - workflowDiagram (Mermaid flowchart syntax)
 
 2. Make sure all fields are consistent with the conversation and do not invent entities that are not implied.
@@ -141,6 +147,15 @@ interface UploadedDocument {
   }[];
 }
 
+interface BusinessTerm {
+  preferredTerm: string;
+  definition: string;
+  aliases: string[];
+  status: "confirmed" | "needs-clarification";
+  sources: string[];
+  clarificationQuestion?: string;
+}
+
 interface RequirementsSummary {
   businessContext: BusinessContext;
   primaryGoal: string;
@@ -154,6 +169,7 @@ interface RequirementsSummary {
   risksAndConstraints: RiskOrConstraint[];
   assumptions: string[];
   openQuestions: string[];
+  ubiquitousLanguage: BusinessTerm[];
   uploadedDocuments: UploadedDocument[];
   workflowDiagram: string;
 }
@@ -197,7 +213,25 @@ List external tools, services, or systems currently in use:
 
 ---
 
-### 4. Workflow Diagram (workflowDiagram)
+### 4. Ubiquitous Language (ubiquitousLanguage)
+
+Capture the customer's business vocabulary from BOTH chat and uploads, including role names, process names, records, statuses, abbreviations, spreadsheet headings, and other repeated domain labels.
+
+For each term:
+- preferredTerm: the exact canonical label the customer uses or explicitly chooses
+- definition: the business meaning supported by the conversation or upload; do not substitute a generic dictionary meaning
+- aliases: other labels actually heard for the same concept
+- status: "confirmed" only when the meaning and preferred label are explicit or confirmed by the customer; otherwise "needs-clarification"
+- sources: evidence such as "Chat" or the exact uploaded filename
+- clarificationQuestion: a focused question when the meaning or preferred label is unresolved
+
+Common words such as "client", "job", "order", "case", "account", "project", "complete", and "approved" can mean different things in different businesses. Do not assume their meaning. Mark them "needs-clarification" unless this customer's usage makes the business meaning explicit.
+
+Use each confirmed preferredTerm verbatim and consistently throughout primaryGoal, secondaryGoals, actors, data entities, candidate modules, requirements descriptions, and Mermaid node labels. Do not switch back to an alias. Unresolved aliases may be listed here but must not be silently chosen as canonical labels.
+
+---
+
+### 5. Workflow Diagram (workflowDiagram)
 
 Generate a Mermaid \`flowchart TD\` showing the relationships between:
 - Actors (user roles)
@@ -277,7 +311,7 @@ The \`workflowDiagram\` string should include:
 
 ---
 
-### 5. Other Required Fields
+### 6. Other Required Fields
 
 - **primaryGoal**: One sentence summarizing the main business objective
 - **secondaryGoals**: Array of additional goals
@@ -287,6 +321,7 @@ The \`workflowDiagram\` string should include:
 - **risksAndConstraints**: Technical, budget, timeline, organizational risks
 - **assumptions**: Statements being treated as true but not yet confirmed. Include persisted discovery-readiness assumptions when discovery is incomplete.
 - **openQuestions**: Unresolved items to clarify later
+- **ubiquitousLanguage**: Customer-owned vocabulary with evidence and confirmation state
 
 ---
 
@@ -376,6 +411,12 @@ The \`workflowDiagram\` string should include:
    - Keep every readiness assumption in assumptions
    - Never silently convert an assumption into a confirmed requirement
 
+12. TERMINOLOGY VALIDATION - BEFORE RETURNING JSON:
+   - Extract key terms found in the chat and uploaded-file summaries
+   - Add every clarificationQuestion for a "needs-clarification" term to openQuestions
+   - Verify confirmed preferredTerm values are reused exactly in modules, stories implied by the requirements, and workflowDiagram labels
+   - Do not use an alias in place of its confirmed preferredTerm
+
 Return ONLY valid JSON, no markdown, no comments.
 `;
 
@@ -410,6 +451,7 @@ Your job is to produce a UserStoriesOutput structure with Epics and User Stories
 - Use the same actors as in RequirementsSummary.mainActors.
 - Refer explicitly to modules named in candidateModules.
 - Reflect real goals and pain points from the summary.
+- Treat RequirementsSummary.ubiquitousLanguage preferredTerm values as the canonical business vocabulary.
 
 ---
 
@@ -550,6 +592,7 @@ Align stories with:
     - Ensure every epic has at least 1 story
     - Confirm all story IDs are unique and sequential
     - Validate that all actors exist in the requirements
+    - Verify epic names, titles, actions, benefits, and acceptance criteria use confirmed preferredTerm values exactly; never replace them with aliases from ubiquitousLanguage
 
 ---
 
@@ -557,6 +600,7 @@ Align stories with:
 
 - Use actor names exactly as they appear in RequirementsSummary.mainActors.
 - Use module names exactly (or very close) to RequirementsSummary.candidateModules.name when referencing functionality.
+- Use confirmed ubiquitousLanguage.preferredTerm values verbatim everywhere they apply. Aliases are context only and must not become competing labels.
 - Do not invent actors or modules that are not present in RequirementsSummary.
 - Prefer fewer, meaningful stories over many repetitive ones.
 - Maintain clear links between:
@@ -599,6 +643,8 @@ Your job is to fix issues in the RequirementsSummary, particularly the workflowD
 - Do NOT invent new actors, modules, or tools that are not present in the existing RequirementsSummary.
 - Do NOT change the overall structure or invent new actors/modules
 - Preserve assumptions and openQuestions, including unresolved discovery-readiness items.
+- Preserve ubiquitousLanguage entries, sources, aliases, confirmation states, and clarification questions.
+- Use confirmed preferredTerm values consistently in candidateModules and workflowDiagram labels; replace any alias drift with the preferred term.
 - Keep all changes faithful to the transcript
 - Be conservative - only fix clear issues
 - Maintain valid Mermaid flowchart TD syntax
@@ -638,6 +684,7 @@ Your job is to refine the UserStoriesOutput to address quality issues:
 - Keep story IDs in the same format (US-XXX)
 - Maintain priority levels (must-have, should-have, nice-to-have) unless clearly misaligned
 - Keep the same RequirementsSummary context - don't invent new actors or modules
+- Use confirmed ubiquitousLanguage.preferredTerm values verbatim in epics, stories, benefits, and acceptance criteria; replace aliases with their preferred term.
 - Be conservative - only fix what's broken
 
 **Your Goal**:
@@ -951,6 +998,7 @@ Given the RequirementsSummary JSON, create a complex, detailed Mermaid flowchart
 6. Uses appropriate node shapes for different element types
 7. Adds styling with classDef for visual clarity
 8. Creates a diagram with 20-30+ nodes showing the complete system
+9. Uses confirmed ubiquitousLanguage.preferredTerm values verbatim for every applicable actor, module, process, status, decision, data-store, and edge label; never substitute an alias
 
 Return ONLY the Mermaid flowchart syntax, no markdown fences, no explanations.
 `;

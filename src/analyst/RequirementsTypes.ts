@@ -69,6 +69,22 @@ export interface UploadedDocument {
   sheets?: UploadedDocumentSheet[];
 }
 
+export type BusinessTermStatus = "confirmed" | "needs-clarification";
+
+/**
+ * A business-owned term that all generated artifacts should use consistently.
+ * `preferredTerm` is the canonical label; aliases are evidence, not alternate
+ * labels for generated requirements.
+ */
+export interface BusinessTerm {
+  preferredTerm: string;
+  definition: string;
+  aliases: string[];
+  status: BusinessTermStatus;
+  sources: string[];
+  clarificationQuestion?: string;
+}
+
 export interface RequirementsSummary {
   businessContext: BusinessContext;
   primaryGoal: string;
@@ -82,6 +98,8 @@ export interface RequirementsSummary {
   risksAndConstraints: RiskOrConstraint[];
   assumptions: string[];
   openQuestions: string[];
+  // Optional for compatibility with requirements generated before this field existed.
+  ubiquitousLanguage?: BusinessTerm[];
   uploadedDocuments: UploadedDocument[];
   workflowDiagram: string;
 }

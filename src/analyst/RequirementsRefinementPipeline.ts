@@ -7,6 +7,7 @@ import {
   includeIncompleteDiscoveryContext,
   normalizeDiscoveryReadiness,
 } from "./DiscoveryReadiness";
+import { includeUbiquitousLanguageContext } from "./UbiquitousLanguage";
 
 /**
  * Result of the refinement pipeline, including the final summary,
@@ -131,8 +132,17 @@ export class RequirementsRefinementPipeline {
       if (!refined.uploadedDocuments) {
         refined.uploadedDocuments = [];
       }
+
+      // Refinement may repair the workflow, but it must not discard the
+      // business vocabulary already captured during extraction.
+      if (
+        !refined.ubiquitousLanguage?.length &&
+        original.ubiquitousLanguage?.length
+      ) {
+        refined.ubiquitousLanguage = original.ubiquitousLanguage;
+      }
       
-      return refined;
+      return includeUbiquitousLanguageContext(refined);
     } catch (error) {
       console.error("Error during refinement, falling back to original:", error);
       return original;
@@ -320,6 +330,7 @@ export class RequirementsRefinementPipeline {
       finalSummary,
       discoveryReadiness
     );
+    finalSummary = includeUbiquitousLanguageContext(finalSummary);
 
     // 4) Generate final documents
     const docsStartTime = Date.now();

@@ -91,6 +91,31 @@ export class DocumentGenerator {
       lines.push("");
     }
 
+    // Business vocabulary is an explicit review surface, including for
+    // legacy or thin-discovery projects where no terms have been confirmed.
+    lines.push(`## Ubiquitous Language / Key Terms`);
+    if (req.ubiquitousLanguage?.length) {
+      for (const term of req.ubiquitousLanguage) {
+        const status = term.status === "confirmed" ? "Confirmed" : "Needs clarification";
+        lines.push(`### ${term.preferredTerm}`);
+        lines.push(term.definition || "Definition not yet confirmed.");
+        lines.push(`- **Status:** ${status}`);
+        if (term.aliases?.length) {
+          lines.push(`- **Also heard as:** ${term.aliases.join(", ")}`);
+        }
+        if (term.sources?.length) {
+          lines.push(`- **Sources:** ${term.sources.join(", ")}`);
+        }
+        if (term.clarificationQuestion) {
+          lines.push(`- **Clarification needed:** ${term.clarificationQuestion}`);
+        }
+        lines.push("");
+      }
+    } else {
+      lines.push("No business-specific terms have been recorded yet.");
+      lines.push("");
+    }
+
     // Uploaded Documents - Show this prominently near the top
     if (req.uploadedDocuments?.length) {
       lines.push(`## Uploaded Documents and Data Sources`);
