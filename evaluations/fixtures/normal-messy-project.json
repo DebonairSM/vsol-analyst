@@ -1,0 +1,126 @@
+{
+  "id": "normal-messy-project-v1",
+  "title": "Normal Messy Project: Community Referral Tracking",
+  "purpose": "Evaluate whether Sunny turns incomplete, inconsistent client input and spreadsheet evidence into a reviewable minimum set of requirements without inventing certainty.",
+  "selectedMode": "Deep Workflow",
+  "transcript": [
+    {
+      "role": "client",
+      "content": "We need something better than the referral tracker. People email us and then Tasha puts the job in the sheet. We call them jobs, although the program team usually says cases or referrals."
+    },
+    {
+      "role": "analyst",
+      "content": "What needs to happen from the time a referral arrives until the work is considered complete?"
+    },
+    {
+      "role": "client",
+      "content": "Intake checks it, somebody approves it, then a coordinator assigns it. Maria normally approves, but I think the program director handles some larger ones. Complete means the family got help, except sometimes it means we closed it because they stopped responding."
+    },
+    {
+      "role": "analyst",
+      "content": "Who needs to see or change each referral, and what should happen when approval is delayed or declined?"
+    },
+    {
+      "role": "client",
+      "content": "Coordinators should only see their own work, managers need everything, and volunteers probably just need contact details. I do not know the decline process. Please keep the spreadsheet because finance uses it."
+    },
+    {
+      "role": "client",
+      "content": "The board wants a monthly report, maybe by program and neighborhood. Finance asks for exports. We also copy approved referrals into QuickBooks somehow and save documents in Google Drive, but I do not know whether that is automatic."
+    }
+  ],
+  "artifacts": [
+    {
+      "filename": "referral-tracker.xlsx",
+      "type": "spreadsheet",
+      "description": "A manually maintained workbook with inconsistent statuses, free-text owner names, and blank approval dates.",
+      "columns": [
+        "Referral ID",
+        "Family",
+        "Program",
+        "Neighborhood",
+        "Status",
+        "Owner",
+        "Approved By",
+        "Approval Date",
+        "Amount",
+        "Drive Link"
+      ],
+      "sampleRows": [
+        {
+          "Referral ID": "R-1042",
+          "Family": "Garcia",
+          "Program": "Food Support",
+          "Neighborhood": "Northside",
+          "Status": "done",
+          "Owner": "Tasha",
+          "Approved By": "Maria",
+          "Approval Date": "2026-06-02",
+          "Amount": 350,
+          "Drive Link": "drive://R-1042"
+        },
+        {
+          "Referral ID": "1043",
+          "Family": "Lee",
+          "Program": "Housing",
+          "Neighborhood": "",
+          "Status": "Closed - no reply",
+          "Owner": "T. Green",
+          "Approved By": "",
+          "Approval Date": "",
+          "Amount": 1200,
+          "Drive Link": ""
+        }
+      ]
+    }
+  ],
+  "expectedMinimum": {
+    "clientSummaryMustMention": [
+      "replace or improve the referral tracker",
+      "intake, approval, assignment, and closure",
+      "reporting and finance exports"
+    ],
+    "confirmedFacts": [
+      "Referrals arrive by email and are entered into a spreadsheet.",
+      "Managers need visibility across all referrals.",
+      "Finance relies on the spreadsheet and requests exports.",
+      "Documents are stored in Google Drive."
+    ],
+    "assumptions": [
+      "Maria is the standard approver.",
+      "QuickBooks receives approved referral data through an integration.",
+      "Volunteers may view family contact details."
+    ],
+    "openQuestions": [
+      "Which business term should be used consistently: job, case, or referral?",
+      "What exact outcomes count as complete versus closed without service?",
+      "Who approves each referral type or value, and what happens after a decline or delay?",
+      "Which fields may volunteers view or change?",
+      "What columns, filters, totals, and delivery format does the monthly board report require?",
+      "Does QuickBooks receive data automatically, and who owns that connection?",
+      "How should existing spreadsheet rows, duplicates, blanks, and inconsistent statuses be migrated?"
+    ],
+    "requiredCapabilities": [
+      "Referral intake and status tracking",
+      "Approval and exception workflow",
+      "Role-based access by coordinator, manager, and volunteer",
+      "Assignment and ownership history",
+      "Board reporting and finance export",
+      "Google Drive document links",
+      "QuickBooks integration discovery",
+      "Spreadsheet migration and reconciliation"
+    ],
+    "readiness": {
+      "shouldWarn": true,
+      "maximumConfidence": 0.69,
+      "missingOrLowConfidenceAreas": [
+        "ubiquitous language",
+        "approval rules",
+        "permissions",
+        "report definitions",
+        "QuickBooks integration",
+        "migration rules"
+      ]
+    }
+  }
+}
