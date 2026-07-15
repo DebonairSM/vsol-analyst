@@ -11,6 +11,7 @@ let progressAnimationInterval = null; // Track progress bar animation
 let currentProgress = 0; // Current progress for smooth animation
 let targetProgress = 0; // Target progress from backend
 let csrfToken = null; // CSRF token for protecting state-changing requests
+let pendingExtractionAction = null; // Action to run after readiness confirmation
 
 // CSRF Token Management
 async function fetchCSRFToken() {
@@ -910,19 +911,107 @@ async function sendMessage() {
     messageInput.focus();
 }
 
-function showConfirmExtractModal() {
+function formatReadinessAreaName(key) {
+    return key
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, character => character.toUpperCase());
+}
+
+async function fetchReadinessWarning() {
+    if (!currentProject) return null;
+
+    const endpoint = currentProject.isAdminView
+        ? `/api/admin/projects/${currentProject.id}/requirements`
+        : `/api/projects/${currentProject.id}/readiness`;
+    const response = await fetch(endpoint, { credentials: 'include' });
+
+    if (!response.ok) {
+        throw new Error(`Failed to load discovery readiness: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.readinessWarning || null;
+}
+
+function renderReadinessWarning(warning) {
+    const warningPanel = document.getElementById('discovery-readiness-warning');
+    const summary = document.getElementById('discovery-readiness-summary');
+    const areaList = document.getElementById('discovery-readiness-areas');
+
+    areaList.replaceChildren();
+
+    if (!warning?.shouldWarn) {
+        warningPanel.style.display = 'none';
+        return;
+    }
+
+    const confidence = Math.round(warning.confidence * 100);
+    const threshold = Math.round(warning.threshold * 100);
+    summary.textContent = `Discovery readiness is ${confidence}% (the configured threshold is ${threshold}%). Sunny can still extract now, but the result may be incomplete.`;
+
+    for (const area of warning.missingAreas || []) {
+        const item = document.createElement('li');
+        item.textContent = `${formatReadinessAreaName(area.key)} — not yet covered`;
+        areaList.appendChild(item);
+    }
+
+    for (const area of warning.lowConfidenceAreas || []) {
+        const item = document.createElement('li');
+        item.textContent = `${formatReadinessAreaName(area.key)} — ${Math.round(area.confidence * 100)}% confidence`;
+        areaList.appendChild(item);
+    }
+
+    warningPanel.style.display = 'block';
+}
+
+function showConfirmExtractModal(warning = null, extractionAction = performExtraction) {
     const modal = document.getElementById('confirm-extract-modal');
+    const title = document.getElementById('confirm-extract-title');
+    const description = document.getElementById('confirm-extract-description');
+    const cancelButton = document.getElementById('confirm-extract-cancel-btn');
+    const continueButton = document.getElementById('confirm-extract-continue-btn');
+
+    pendingExtractionAction = extractionAction;
+    renderReadinessWarning(warning);
+
+    if (warning?.shouldWarn) {
+        title.textContent = 'Discovery may be incomplete';
+        description.textContent = 'Some areas need more discovery before these requirements are ready to share or approve.';
+        cancelButton.textContent = 'Return to chat';
+        cancelButton.onclick = returnToChatFromExtractionWarning;
+        continueButton.textContent = 'Continue extraction';
+    } else {
+        title.textContent = 'Extract Requirements?';
+        description.textContent = 'This will analyze all messages in the current conversation and generate requirements documentation.';
+        cancelButton.textContent = 'Cancel';
+        cancelButton.onclick = hideConfirmExtractModal;
+        continueButton.textContent = 'Extract';
+    }
+
     modal.classList.add('visible');
 }
 
 function hideConfirmExtractModal() {
     const modal = document.getElementById('confirm-extract-modal');
     modal.classList.remove('visible');
+    pendingExtractionAction = null;
+}
+
+function returnToChatFromExtractionWarning() {
+    const isRequirementsPage = requirementsPage?.classList.contains('visible');
+    hideConfirmExtractModal();
+
+    if (isRequirementsPage) {
+        returnToChat();
+    }
+
+    messageInput.focus();
 }
 
 function confirmExtract() {
+    const extractionAction = pendingExtractionAction || performExtraction;
     hideConfirmExtractModal();
-    performExtraction();
+    extractionAction();
 }
 
 function showOutputModal() {
@@ -1035,7 +1124,20 @@ function hideOutputModal() {
 
 async function extractRequirements() {
     if (isProcessing || !currentProject) return;
-    showConfirmExtractModal();
+    await requestExtraction(performExtraction);
+}
+
+async function requestExtraction(extractionAction) {
+    let warning = null;
+
+    try {
+        warning = await fetchReadinessWarning();
+    } catch (error) {
+        // Readiness must never gate extraction. Fall back to the normal confirm.
+        console.warn('Could not load discovery readiness before extraction:', error);
+    }
+
+    showConfirmExtractModal(warning, extractionAction);
 }
 
 async function performExtraction() {
@@ -1237,6 +1339,11 @@ async function updateRequirementsButtonStates() {
 
 // Refresh requirements on the requirements page
 async function refreshRequirementsOnPage() {
+    if (isProcessing || !currentProject) return;
+    await requestExtraction(performRequirementsPageRefresh);
+}
+
+async function performRequirementsPageRefresh() {
     if (!currentProject) return;
     
     // Show loading state

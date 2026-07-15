@@ -191,12 +191,24 @@ export class DocumentGenerator {
       lines.push("");
     }
 
-    // Open Questions
-    if (req.openQuestions?.length) {
-      lines.push(`## Open Questions`);
-      for (const q of req.openQuestions) lines.push(`- ${q}`);
-      lines.push("");
+    // Keep these review sections visible even when discovery has not captured
+    // an item yet; an empty field should not disappear from an approval copy.
+    lines.push(`## Assumptions`);
+    if (req.assumptions?.length) {
+      for (const assumption of req.assumptions) lines.push(`- ${assumption}`);
+    } else {
+      lines.push("No assumptions have been recorded.");
     }
+    lines.push("");
+
+    // Open Questions
+    lines.push(`## Open Questions`);
+    if (req.openQuestions?.length) {
+      for (const q of req.openQuestions) lines.push(`- ${q}`);
+    } else {
+      lines.push("No open questions have been recorded.");
+    }
+    lines.push("");
 
     return lines.join("\n");
   }

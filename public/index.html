@@ -1006,6 +1006,34 @@
             background: #15803d;
         }
 
+        .discovery-readiness-warning {
+            margin: 1rem 0;
+            padding: 1rem;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            background: #fffbeb;
+            color: #78350f;
+        }
+
+        .discovery-readiness-warning h4 {
+            margin: 0 0 0.5rem;
+            color: #92400e;
+        }
+
+        .discovery-readiness-warning p {
+            margin: 0 0 0.75rem;
+            line-height: 1.5;
+        }
+
+        .discovery-readiness-warning ul {
+            margin: 0;
+            padding-left: 1.25rem;
+        }
+
+        .discovery-readiness-warning li + li {
+            margin-top: 0.35rem;
+        }
+
         /* Admin Stats */
         .admin-stats-grid {
             display: grid;
@@ -2444,13 +2472,18 @@
 
     <div id="confirm-extract-modal" class="modal">
         <div class="modal-content">
-            <h3>Extract Requirements?</h3>
-            <p style="margin: 1rem 0; color: #6b7280; line-height: 1.5;">
+            <h3 id="confirm-extract-title">Extract Requirements?</h3>
+            <p id="confirm-extract-description" style="margin: 1rem 0; color: #6b7280; line-height: 1.5;">
                 This will analyze all messages in the current conversation and generate requirements documentation.
             </p>
+            <div id="discovery-readiness-warning" class="discovery-readiness-warning" role="alert" style="display: none;">
+                <h4>Areas that may be incomplete</h4>
+                <p id="discovery-readiness-summary"></p>
+                <ul id="discovery-readiness-areas"></ul>
+            </div>
             <div class="modal-actions">
-                <button class="cancel-btn" onclick="hideConfirmExtractModal()">Cancel</button>
-                <button class="create-btn" onclick="confirmExtract()">Extract</button>
+                <button id="confirm-extract-cancel-btn" class="cancel-btn" onclick="hideConfirmExtractModal()">Cancel</button>
+                <button id="confirm-extract-continue-btn" class="create-btn" onclick="confirmExtract()">Extract</button>
             </div>
         </div>
     </div>

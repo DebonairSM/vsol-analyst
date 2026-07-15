@@ -16,7 +16,10 @@ import { RequirementsRefinementPipeline } from "../analyst/RequirementsRefinemen
 import { UserStoryRefinementPipeline } from "../analyst/UserStoryRefinementPipeline";
 import { FlowchartGenerator } from "../analyst/FlowchartGenerator";
 import { convertPriorityToDb, convertEffortToDb } from "../analyst/RequirementsTypes";
-import { normalizeDiscoveryReadiness } from "../analyst/DiscoveryReadiness";
+import {
+  assessDiscoveryReadiness,
+  normalizeDiscoveryReadiness,
+} from "../analyst/DiscoveryReadiness";
 
 const router = Router();
 
@@ -187,6 +190,7 @@ router.post("/projects/:id/extract", requireAdmin, async (req, res) => {
         requirements: result.requirements,
         markdown: result.markdown,
         mermaid: result.mermaid,
+        readinessWarning: assessDiscoveryReadiness(project.discoveryReadiness),
         wasRefined: result.wasRefined,
         metrics: result.metrics,
       });
@@ -243,6 +247,7 @@ router.get("/projects/:id/requirements", requireAdmin, asyncHandler(async (req, 
     return res.json({
       requirements: null,
       readiness: normalizeDiscoveryReadiness(project.discoveryReadiness),
+      readinessWarning: assessDiscoveryReadiness(project.discoveryReadiness),
       markdown: "",
       mermaid: "",
       detailedFlowchart: "",
@@ -274,6 +279,7 @@ router.get("/projects/:id/requirements", requireAdmin, asyncHandler(async (req, 
   res.json({
     requirements: project.generatedRequirements,
     readiness: normalizeDiscoveryReadiness(project.discoveryReadiness),
+    readinessWarning: assessDiscoveryReadiness(project.discoveryReadiness),
     markdown: project.requirementsMarkdown || "",
     mermaid: project.requirementsMermaid || "",
     detailedFlowchart: project.detailedFlowchartMermaid || "",

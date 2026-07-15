@@ -1,4 +1,5 @@
 export const DISCOVERY_READINESS_VERSION = 1 as const;
+export const DEFAULT_DISCOVERY_READINESS_THRESHOLD = 0.7;
 
 export type DiscoveryReadinessStatus =
   | "not_started"
@@ -41,6 +42,24 @@ export interface DiscoveryReadinessPatch {
   sections?: DiscoveryReadinessSectionPatch[];
   assumptions?: string[];
   openQuestions?: string[];
+}
+
+export interface DiscoveryReadinessArea {
+  key: string;
+  status: DiscoveryReadinessStatus;
+  confidence: number;
+}
+
+export interface DiscoveryReadinessAssessment {
+  shouldWarn: boolean;
+  isBelowThreshold: boolean;
+  threshold: number;
+  confidence: number;
+  status: DiscoveryReadinessStatus;
+  missingAreas: DiscoveryReadinessArea[];
+  lowConfidenceAreas: DiscoveryReadinessArea[];
+  assumptions: string[];
+  openQuestions: string[];
 }
 
 export function createEmptyDiscoveryReadiness(): DiscoveryReadiness {
@@ -140,6 +159,105 @@ export function formatDiscoveryReadinessContext(value: unknown): string {
   ].join("\n");
 }
 
+export function getDiscoveryReadinessThreshold(
+  configuredValue = process.env.DISCOVERY_READINESS_THRESHOLD
+): number {
+  if (configuredValue === undefined || configuredValue.trim() === "") {
+    return DEFAULT_DISCOVERY_READINESS_THRESHOLD;
+  }
+
+  const threshold = Number(configuredValue);
+  return Number.isFinite(threshold) && threshold >= 0 && threshold <= 1
+    ? threshold
+    : DEFAULT_DISCOVERY_READINESS_THRESHOLD;
+}
+
+export function assessDiscoveryReadiness(
+  value: unknown,
+  threshold = getDiscoveryReadinessThreshold()
+): DiscoveryReadinessAssessment {
+  const readiness = normalizeDiscoveryReadiness(value);
+  const safeThreshold =
+    Number.isFinite(threshold) && threshold >= 0 && threshold <= 1
+      ? threshold
+      : DEFAULT_DISCOVERY_READINESS_THRESHOLD;
+
+  const missingAreas = readiness.sections
+    .filter((section) => section.status === "not_started")
+    .map(toReadinessArea);
+  const lowConfidenceAreas = readiness.sections
+    .filter(
+      (section) =>
+        section.status !== "not_started" &&
+        (section.confidence < safeThreshold || section.status === "blocked")
+    )
+    .map(toReadinessArea);
+
+  const isBelowThreshold = readiness.confidence < safeThreshold;
+  const shouldWarn = isBelowThreshold;
+
+  // A newly created or sparsely populated readiness record has no named
+  // sections. Keep the warning useful by exposing the overall discovery area.
+  if (shouldWarn && missingAreas.length === 0 && lowConfidenceAreas.length === 0) {
+    const overallArea: DiscoveryReadinessArea = {
+      key: "overall_discovery",
+      status: readiness.status,
+      confidence: readiness.confidence,
+    };
+
+    if (readiness.status === "not_started") {
+      missingAreas.push(overallArea);
+    } else {
+      lowConfidenceAreas.push(overallArea);
+    }
+  }
+
+  const incompleteSections = readiness.sections.filter(
+    (section) =>
+      section.status !== "ready" || section.confidence < safeThreshold
+  );
+
+  return {
+    shouldWarn,
+    isBelowThreshold,
+    threshold: safeThreshold,
+    confidence: readiness.confidence,
+    status: readiness.status,
+    missingAreas,
+    lowConfidenceAreas,
+    assumptions: mergeUniqueStrings(
+      readiness.assumptions,
+      ...incompleteSections.map((section) => section.assumptions)
+    ),
+    openQuestions: mergeUniqueStrings(
+      readiness.openQuestions,
+      ...incompleteSections.map((section) => section.openQuestions)
+    ),
+  };
+}
+
+export function includeIncompleteDiscoveryContext<
+  T extends { assumptions?: string[]; openQuestions?: string[] }
+>(
+  requirements: T,
+  readinessValue: unknown,
+  threshold = getDiscoveryReadinessThreshold()
+): T & { assumptions: string[]; openQuestions: string[] } {
+  const assessment = assessDiscoveryReadiness(readinessValue, threshold);
+  const assumptions = assessment.shouldWarn
+    ? mergeUniqueStrings(requirements.assumptions, assessment.assumptions)
+    : mergeUniqueStrings(requirements.assumptions);
+  const openQuestions = assessment.shouldWarn
+    ? mergeUniqueStrings(requirements.openQuestions, assessment.openQuestions)
+    : mergeUniqueStrings(requirements.openQuestions);
+
+  return {
+    ...requirements,
+    assumptions,
+    openQuestions,
+  };
+}
+
 export function withDiscoveryReadinessContext<T extends { role: string; content: unknown }>(
   messages: T[],
   value: unknown
@@ -186,6 +304,16 @@ function normalizeSection(
   };
 }
 
+function toReadinessArea(
+  section: DiscoveryReadinessSection
+): DiscoveryReadinessArea {
+  return {
+    key: section.key,
+    status: section.status,
+    confidence: section.confidence,
+  };
+}
+
 function normalizeStatus(
   value: unknown,
   fallback: DiscoveryReadinessStatus
@@ -214,4 +342,19 @@ function normalizeStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+}
+
+function mergeUniqueStrings(...values: Array<unknown>): string[] {
+  const merged = new Map<string, string>();
+
+  for (const value of values) {
+    for (const item of normalizeStringArray(value)) {
+      const normalized = item.trim();
+      if (normalized && !merged.has(normalized.toLocaleLowerCase())) {
+        merged.set(normalized.toLocaleLowerCase(), normalized);
+      }
+    }
+  }
+
+  return [...merged.values()];
 }

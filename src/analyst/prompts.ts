@@ -80,6 +80,7 @@ Given the transcript, you must:
    - candidateModules
    - nonFunctionalNeeds
    - risksAndConstraints
+   - assumptions
    - openQuestions
    - workflowDiagram (Mermaid flowchart syntax)
 
@@ -151,6 +152,7 @@ interface RequirementsSummary {
   candidateModules: CandidateModule[];
   nonFunctionalNeeds: string[];
   risksAndConstraints: RiskOrConstraint[];
+  assumptions: string[];
   openQuestions: string[];
   uploadedDocuments: UploadedDocument[];
   workflowDiagram: string;
@@ -283,6 +285,7 @@ The \`workflowDiagram\` string should include:
 - **dataEntities**: Domain objects with their fields
 - **nonFunctionalNeeds**: Performance, security, mobile access, branding
 - **risksAndConstraints**: Technical, budget, timeline, organizational risks
+- **assumptions**: Statements being treated as true but not yet confirmed. Include persisted discovery-readiness assumptions when discovery is incomplete.
 - **openQuestions**: Unresolved items to clarify later
 
 ---
@@ -367,6 +370,11 @@ The \`workflowDiagram\` string should include:
    you have made an ERROR. Fix it before returning.
 
 10. Do NOT fabricate information, but DO capture everything mentioned or shown.
+
+11. INCOMPLETE DISCOVERY - If the discovery readiness context is not ready or is below its configured confidence threshold:
+   - Keep every unresolved readiness question in openQuestions
+   - Keep every readiness assumption in assumptions
+   - Never silently convert an assumption into a confirmed requirement
 
 Return ONLY valid JSON, no markdown, no comments.
 `;
@@ -590,6 +598,7 @@ Your job is to fix issues in the RequirementsSummary, particularly the workflowD
 - Prefer to fix problems by editing ONLY the workflowDiagram field.
 - Do NOT invent new actors, modules, or tools that are not present in the existing RequirementsSummary.
 - Do NOT change the overall structure or invent new actors/modules
+- Preserve assumptions and openQuestions, including unresolved discovery-readiness items.
 - Keep all changes faithful to the transcript
 - Be conservative - only fix clear issues
 - Maintain valid Mermaid flowchart TD syntax
