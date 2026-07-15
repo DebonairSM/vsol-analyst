@@ -24,6 +24,7 @@ import adminRoutes from "./routes/admin";
 import analystRoutes from "./routes/analyst";
 import mcpApiRoutes from "./routes/mcp-api";
 import systemRoutes from "./routes/system";
+import organizationPreferenceRoutes from "./routes/organization-preferences";
 
 const app = express();
 const isProd = process.env.NODE_ENV === "production";
@@ -167,6 +168,7 @@ app.get("/api/csrf-token", generateCSRFToken, (req, res) => {
 // Mount route modules with CSRF protection (except for MCP API which uses API keys)
 app.use("/auth", validateCSRFToken, authRoutes);
 app.use("/api/projects", validateCSRFToken, projectRoutes);
+app.use("/api/organization-preferences", validateCSRFToken, organizationPreferenceRoutes);
 app.use("/api/attachments", validateCSRFToken, attachmentRoutes);
 app.use("/api/admin", validateCSRFToken, adminRoutes);
 app.use("/analyst", validateCSRFToken, analystRoutes);

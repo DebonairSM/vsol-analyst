@@ -2192,6 +2192,10 @@
                 <h2 id="projects-page-title">Your Projects</h2>
                 <div>
                     <button id="admin-view-btn" class="new-project-btn" onclick="showAdminDashboard()" style="display: none; margin-right: 0.5rem; background: #FF6B6B;">Admin Dashboard</button>
+                    <button class="new-project-btn" onclick="showOrganizationPreferencesModal()" style="margin-right: 0.5rem; background: #6366f1;">
+                        <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle;">memory</span>
+                        Organization Preferences
+                    </button>
                     <button class="new-project-btn" onclick="showNewProjectModal()">+ New Project</button>
                 </div>
             </div>
@@ -2320,6 +2324,15 @@
                 </div>
                 <button class="back-btn" onclick="backToProjects()">← Back to Projects</button>
             </div>
+            <section id="organization-context-panel" style="display: none; margin: 0 0 1rem; padding: 1rem; border: 1px solid #c7d2fe; border-radius: 10px; background: #eef2ff; color: #312e81;">
+                <h3 style="margin: 0 0 0.35rem; font-size: 1rem;">Remembered organization context</h3>
+                <p style="margin: 0 0 0.75rem; font-size: 0.875rem; line-height: 1.4;">Select only the defaults that apply to this project. Sunny will keep accepted items as assumptions until you explicitly confirm them as project facts.</p>
+                <div id="organization-context-items" style="display: grid; gap: 0.5rem;"></div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap;">
+                    <button class="create-btn" onclick="applySelectedOrganizationContext()">Use selected as assumptions</button>
+                    <button class="cancel-btn" onclick="dismissOrganizationContext()">Dismiss for this project</button>
+                </div>
+            </section>
             <div id="chat-container"></div>
             <div id="input-container">
                 <textarea 
@@ -2510,6 +2523,31 @@
             <div class="modal-actions">
                 <button class="cancel-btn" onclick="hideNewProjectModal()">Cancel</button>
                 <button class="create-btn" onclick="createProject()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="organization-preferences-modal" class="modal">
+        <div class="modal-content" style="max-width: 720px; max-height: 85vh; overflow-y: auto;">
+            <h3>Organization Preferences</h3>
+            <p style="color: #6b7280; line-height: 1.45; margin: 0.5rem 0 1rem;">Save reusable context for future projects. Every new project will ask you to confirm these items before Sunny uses them.</p>
+            <select id="organization-preference-category" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; margin-bottom: 0.75rem;">
+                <option value="key_term">Key term</option>
+                <option value="standard_role">Standard role</option>
+                <option value="preferred_report">Preferred report</option>
+                <option value="recurring_integration">Recurring integration</option>
+                <option value="delivery_preference">VSol delivery preference</option>
+            </select>
+            <input id="organization-preference-label" type="text" placeholder="Short label (for example, Monthly Board Report)" />
+            <input id="organization-preference-value" type="text" placeholder="Remembered value or default" />
+            <textarea id="organization-preference-notes" placeholder="Optional notes" style="width: 100%; min-height: 70px; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; margin-bottom: 0.75rem; font: inherit;"></textarea>
+            <div class="modal-actions" style="margin-bottom: 1rem;">
+                <button class="cancel-btn" onclick="resetOrganizationPreferenceForm()">Clear</button>
+                <button id="organization-preference-save-btn" class="create-btn" onclick="saveOrganizationPreference()">Add preference</button>
+            </div>
+            <div id="organization-preferences-list" style="display: grid; gap: 0.75rem; border-top: 1px solid #e5e7eb; padding-top: 1rem;"></div>
+            <div class="modal-actions" style="margin-top: 1rem;">
+                <button class="cancel-btn" onclick="hideOrganizationPreferencesModal()">Close</button>
             </div>
         </div>
     </div>

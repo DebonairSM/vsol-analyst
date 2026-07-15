@@ -172,6 +172,8 @@ const requirementsFlowchartOutput = document.getElementById('requirements-detail
 const newProjectModal = document.getElementById('new-project-modal');
 const newProjectNameInput = document.getElementById('new-project-name');
 const adminContent = document.getElementById('admin-content');
+let organizationPreferencesCompanyId = null;
+let editingOrganizationPreferenceId = null;
 
 function configureAvatarElement(avatarEl, size = 36) {
     if (!avatarEl) return;
@@ -369,6 +371,7 @@ async function showChat(project) {
     
     // Load existing chat history
     await loadChatHistory(project.id);
+    await loadOrganizationContext();
     
     // Check if requirements exist and update button states
     await updateRequirementsButtonStates();
@@ -583,6 +586,208 @@ function showNewProjectModal() {
 
 function hideNewProjectModal() {
     newProjectModal.classList.remove('visible');
+}
+
+const organizationPreferenceCategoryLabels = {
+    key_term: 'Key term',
+    standard_role: 'Standard role',
+    preferred_report: 'Preferred report',
+    recurring_integration: 'Recurring integration',
+    delivery_preference: 'VSol delivery preference'
+};
+
+async function showOrganizationPreferencesModal() {
+    document.getElementById('organization-preferences-modal').classList.add('visible');
+    resetOrganizationPreferenceForm();
+    await loadOrganizationPreferences();
+}
+
+function hideOrganizationPreferencesModal() {
+    document.getElementById('organization-preferences-modal').classList.remove('visible');
+}
+
+function resetOrganizationPreferenceForm() {
+    editingOrganizationPreferenceId = null;
+    document.getElementById('organization-preference-category').value = 'key_term';
+    document.getElementById('organization-preference-label').value = '';
+    document.getElementById('organization-preference-value').value = '';
+    document.getElementById('organization-preference-notes').value = '';
+    document.getElementById('organization-preference-save-btn').textContent = 'Add preference';
+}
+
+async function loadOrganizationPreferences() {
+    const list = document.getElementById('organization-preferences-list');
+    list.textContent = 'Loading preferences...';
+    try {
+        const response = await fetch('/api/organization-preferences', { credentials: 'include' });
+        if (!response.ok) throw new Error('Failed to load organization preferences');
+        const data = await response.json();
+        organizationPreferencesCompanyId = data.companyId;
+        renderOrganizationPreferences(data.preferences.items || []);
+    } catch (error) {
+        console.error('Error loading organization preferences:', error);
+        list.textContent = 'Unable to load organization preferences.';
+    }
+}
+
+function renderOrganizationPreferences(items) {
+    const list = document.getElementById('organization-preferences-list');
+    list.replaceChildren();
+    if (!items.length) {
+        const empty = document.createElement('p');
+        empty.textContent = 'No organization preferences saved yet.';
+        empty.style.color = '#6b7280';
+        list.appendChild(empty);
+        return;
+    }
+
+    for (const item of items) {
+        const card = document.createElement('div');
+        card.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.75rem; background: #f9fafb;';
+        const heading = document.createElement('strong');
+        heading.textContent = `${item.label}: ${item.value}`;
+        const category = document.createElement('div');
+        category.textContent = organizationPreferenceCategoryLabels[item.category] || item.category;
+        category.style.cssText = 'font-size: 0.75rem; color: #6366f1; margin-top: 0.2rem;';
+        card.append(heading, category);
+        if (item.notes) {
+            const notes = document.createElement('p');
+            notes.textContent = item.notes;
+            notes.style.cssText = 'margin: 0.5rem 0 0; color: #6b7280; font-size: 0.875rem;';
+            card.appendChild(notes);
+        }
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display: flex; gap: 0.5rem; margin-top: 0.65rem;';
+        const edit = document.createElement('button');
+        edit.className = 'cancel-btn';
+        edit.textContent = 'Edit';
+        edit.onclick = () => editOrganizationPreference(item);
+        const remove = document.createElement('button');
+        remove.className = 'cancel-btn';
+        remove.textContent = 'Remove';
+        remove.onclick = () => removeOrganizationPreference(item.id);
+        actions.append(edit, remove);
+        card.appendChild(actions);
+        list.appendChild(card);
+    }
+}
+
+function editOrganizationPreference(item) {
+    editingOrganizationPreferenceId = item.id;
+    document.getElementById('organization-preference-category').value = item.category;
+    document.getElementById('organization-preference-label').value = item.label;
+    document.getElementById('organization-preference-value').value = item.value;
+    document.getElementById('organization-preference-notes').value = item.notes || '';
+    document.getElementById('organization-preference-save-btn').textContent = 'Save changes';
+}
+
+async function saveOrganizationPreference() {
+    const body = {
+        companyId: organizationPreferencesCompanyId,
+        category: document.getElementById('organization-preference-category').value,
+        label: document.getElementById('organization-preference-label').value.trim(),
+        value: document.getElementById('organization-preference-value').value.trim(),
+        notes: document.getElementById('organization-preference-notes').value.trim()
+    };
+    if (!body.label || !body.value) {
+        showToast('Add both a label and a remembered value.', 'warning');
+        return;
+    }
+    const endpoint = editingOrganizationPreferenceId
+        ? `/api/organization-preferences/${editingOrganizationPreferenceId}`
+        : '/api/organization-preferences';
+    const response = await secureFetch(endpoint, {
+        method: editingOrganizationPreferenceId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+        showToast('Failed to save organization preference.', 'error');
+        return;
+    }
+    resetOrganizationPreferenceForm();
+    await loadOrganizationPreferences();
+    showToast('Organization preference saved.', 'success');
+}
+
+async function removeOrganizationPreference(itemId) {
+    if (!window.confirm('Remove this organization preference?')) return;
+    const query = organizationPreferencesCompanyId
+        ? `?companyId=${encodeURIComponent(organizationPreferencesCompanyId)}`
+        : '';
+    const response = await secureFetch(`/api/organization-preferences/${itemId}${query}`, {
+        method: 'DELETE'
+    });
+    if (!response.ok) {
+        showToast('Failed to remove organization preference.', 'error');
+        return;
+    }
+    await loadOrganizationPreferences();
+    showToast('Organization preference removed.', 'success');
+}
+
+async function loadOrganizationContext() {
+    const panel = document.getElementById('organization-context-panel');
+    const list = document.getElementById('organization-context-items');
+    panel.style.display = 'none';
+    list.replaceChildren();
+    if (!currentProject || currentProject.isAdminView) return;
+
+    try {
+        const response = await fetch(`/api/projects/${currentProject.id}/organization-context`, { credentials: 'include' });
+        if (!response.ok) throw new Error('Failed to load remembered context');
+        const data = await response.json();
+        const pending = (data.context || []).filter(item => item.status === 'pending_confirmation');
+        if (!pending.length) return;
+        for (const item of pending) {
+            const label = document.createElement('label');
+            label.style.cssText = 'display: flex; align-items: flex-start; gap: 0.5rem; background: white; border-radius: 6px; padding: 0.6rem;';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.dataset.organizationContextId = item.id;
+            checkbox.style.marginTop = '0.2rem';
+            const text = document.createElement('span');
+            text.textContent = `${item.label}: ${item.value}`;
+            label.append(checkbox, text);
+            list.appendChild(label);
+        }
+        panel.style.display = 'block';
+    } catch (error) {
+        console.error('Error loading remembered organization context:', error);
+    }
+}
+
+async function applySelectedOrganizationContext() {
+    const selected = [...document.querySelectorAll('[data-organization-context-id]:checked')];
+    if (!selected.length) {
+        showToast('Select at least one remembered preference to use.', 'warning');
+        return;
+    }
+    await updateOrganizationContext(
+        selected.map(input => ({ id: input.dataset.organizationContextId, action: 'accept' }))
+    );
+}
+
+async function dismissOrganizationContext() {
+    const items = [...document.querySelectorAll('[data-organization-context-id]')];
+    await updateOrganizationContext(
+        items.map(input => ({ id: input.dataset.organizationContextId, action: 'dismiss' }))
+    );
+}
+
+async function updateOrganizationContext(decisions) {
+    if (!decisions.length || !currentProject) return;
+    const response = await secureFetch(`/api/projects/${currentProject.id}/organization-context`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decisions })
+    });
+    if (!response.ok) {
+        showToast('Failed to update remembered context.', 'error');
+        return;
+    }
+    await loadOrganizationContext();
+    showToast('Remembered context updated for this project.', 'success');
 }
 
 async function createProject() {

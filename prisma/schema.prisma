@@ -27,6 +27,7 @@ model Company {
   userId    String
   user      User      @relation(fields: [userId], references: [id])
   projects  Project[]
+  discoveryPreferences Json?
   createdAt DateTime  @default(now())
 }
 
