@@ -2,6 +2,7 @@ import { LLMProvider, ChatMessage } from "../llm/LLMProvider";
 import { SYSTEM_PROMPT_EXTRACTOR } from "./prompts";
 import { RequirementsSummary } from "./RequirementsTypes";
 import { formatDiscoveryReadinessContext } from "./DiscoveryReadiness";
+import { includeUbiquitousLanguageContext } from "./UbiquitousLanguage";
 
 export class RequirementsExtractor {
   constructor(private llm: LLMProvider) {}
@@ -71,12 +72,14 @@ export class RequirementsExtractor {
       resolveAttachment,
     });
 
-    const requirements = JSON.parse(json) as RequirementsSummary;
+    let requirements = JSON.parse(json) as RequirementsSummary;
     
     // Ensure uploadedDocuments is always an array
     if (!requirements.uploadedDocuments) {
       requirements.uploadedDocuments = [];
     }
+
+    requirements = includeUbiquitousLanguageContext(requirements);
     
     return requirements;
   }
